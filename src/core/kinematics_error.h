@@ -63,7 +63,6 @@ public:
     Eigen::Matrix<T, 2, 1> angle_vec(cos(T(pose_1[2])), sin(T(pose_1[2])));
     T dir = deltaS.dot(angle_vec);
     residuals_map(1) = dir > T(0) ? T(0) : -dir;
-
     return true;
   }
 

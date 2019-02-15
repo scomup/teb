@@ -7,6 +7,8 @@
 #include "src/core/types.h"
 #include "src/core/teb_planner.h"
 #include "src/top/log_io.h"
+#include "src/core/obstacles.h"
+#include "src/core/robot_footprint_model.h"
 
 #include <QApplication>
 #include "src/qtviewer/window.h"
@@ -18,7 +20,7 @@ int main(int argc, char **argv)
 
     //std::vector<transform::TimestampedTransform2d> path;
     //std::vector<Eigen::Vector2d> obstacles;
-    LogFile f("/home/liu/workspace/teb/build/path.txt");
+    LogFile f("/home/liu/workspace/teb/path.txt");
     std::vector<teb_demo::Pose2d> paths;
     std::vector<teb_demo::Obst2d> obsts;
 
@@ -34,7 +36,7 @@ int main(int argc, char **argv)
     //return app.exec();
 
 
-    TEBPlanner teb(f.paths(), obsts);
+    TEBPlanner teb(f.paths(), f.obsts());
     teb.slove();
     printf("OK!\n");
 

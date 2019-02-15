@@ -24,7 +24,7 @@ find_package(Pangolin REQUIRED)
 
 
 add_definitions(-DEIGEN_DONT_ALIGN_STATICALLY)
-find_package(catkin REQUIRED COMPONENTS roscpp nav_msgs  message_filters laser_geometry  rosbag)
+find_package(catkin REQUIRED COMPONENTS roscpp nav_msgs  message_filters laser_geometry visualization_msgs  rosbag)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 

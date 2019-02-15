@@ -36,6 +36,8 @@
 #include "ceres/ceres.h"
 #include "src/core/types.h"
 #include "src/core/kinematics_error.h"
+#include "src/core/obstacle_error.h"
+#include "src/core/obstacles.h"
 
 namespace teb_demo
 {
@@ -60,15 +62,23 @@ void slove(){
                             point.y,
                             point.yaw_radians});
     }
+
+    std::vector<Obstacle*> obstacles;
+    for (auto &obst : obsts_)
+    {
+      obstacles.push_back(new PointObstacle(obst.x, obst.x));
+    }
+
+
     for (auto &point : path)
     {
       std::cout << point.x << "," << point.y << "," << point.yaw_radians << "\n";
     }
 
-    for (size_t i = 0; i < path.size(); i++)
+    for (size_t i = 0; i < path.size()-1; i++)
     {
       Eigen::Matrix2d information;
-      information << 1, 0, 0, 1;
+      information << 1000, 0, 0, 1;
 
       auto &current = path[i];
       auto &next = path[i + 1];
@@ -81,6 +91,22 @@ void slove(){
                                reinterpret_cast<double *>(&current),
                                reinterpret_cast<double *>(&next));
     }
+
+    BaseRobotFootprintModel* robot = new PointRobotFootprint;
+
+    for (size_t i = 0; i < obstacles.size(); i++)
+    {
+      ceres::CostFunction *cost_function = ObstacleError::Create(robot, obstacles[i]);
+
+      for (size_t j = 0; j < path.size(); j++)
+      {
+        auto &current = path[j];
+
+        problem.AddResidualBlock(cost_function, NULL,
+                                 reinterpret_cast<double *>(&current));
+      }
+    }
+    
 
     for (size_t i = 0; i < path.size(); i++)
     {
@@ -97,75 +123,6 @@ void slove(){
     problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
     std::cout << "total_cost:" << total_cost << "\n";
 
-    ceres::Solver::Options options;
-    options.max_num_iterations = 100;
-    options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
-
-    ceres::Solver::Summary summary;
-     ceres::Solve(options, &problem, &summary);
-/*
-    std::cout << "\noutput path:\n";
-   for (auto &point : path)
-    {
-      std::cout << point.x << "," << point.y << "," << point.yaw_radians << "\n";
-    }
-    problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
-    std::cout << "total_cost:" << total_cost << "\n";
-    */
-  }
-
-  TEBPlanner(std::vector<transform::TimestampedTransform2d> path_0, std::vector<Eigen::Vector2d> obstacles)
-  {
-
-    ceres::Problem problem;
-
-    ceres::LossFunction *loss_function = NULL;
-
-    std::vector<Pose2d> path;
-
-    std::cout << "\nintput path:\n";
-    for (auto &point : path_0)
-    {
-
-      path.push_back(Pose2d{point.transform.translation().x(),
-                            point.transform.translation().y(),
-                            point.transform.rotation().angle()});
-      std::cout << path.back().x << "," << path.back().y << "," << path.back().yaw_radians << "\n";
-    }
-
-    for (size_t i = 0; i < path.size(); i++)
-    {
-      Eigen::Matrix2d information;
-      information << 1, 0, 0, 1;
-
-      auto &current = path[i];
-      auto &next = path[i + 1];
-      const Eigen::Matrix2d sqrt_information =
-          information.llt().matrixL();
-
-      ceres::CostFunction *cost_function = KinematicsError::Create(sqrt_information);
-
-      problem.AddResidualBlock(cost_function, loss_function,
-                               reinterpret_cast<double *>(&current),
-                               reinterpret_cast<double *>(&next));
-    }
-
-    for (size_t i = 0; i < path.size(); i++)
-    {
-      auto &current = path[i];
-      if (i == 0 || i == path.size() - 1)
-        problem.SetParameterBlockConstant(reinterpret_cast<double *>(&current));
-      //else
-      //  problem.SetParameterBlockVariable(reinterpret_cast<double *>(&current));
-    }
-
-    ceres::Problem::EvaluateOptions evaluate_options;
-
-    double total_cost = 0.0;
-    std::vector<double> residuals;
-
-    problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
-    std::cout << "total_cost:" << total_cost << "\n";
 
     ceres::Solver::Options options;
     options.max_num_iterations = 100;
@@ -175,13 +132,16 @@ void slove(){
     ceres::Solve(options, &problem, &summary);
 
     std::cout << "\noutput path:\n";
-    for (auto &point : path)
+   for (auto &point : path)
     {
       std::cout << point.x << "," << point.y << "," << point.yaw_radians << "\n";
     }
     problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
     std::cout << "total_cost:" << total_cost << "\n";
+    
   }
+
+
   private:
   std::vector<Pose2d> paths_; 
   std::vector<Obst2d> obsts_;
