@@ -53,7 +53,7 @@
 #include <geometry_msgs/TwistWithCovariance.h>
 #include <geometry_msgs/QuaternionStamped.h>
 
-#include "src/core/distance_calculations.h"
+#include "src/teb/distance_calculations.h"
 
 
 namespace teb_demo

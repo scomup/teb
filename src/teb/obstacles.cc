@@ -36,7 +36,7 @@
  * Author: Christoph Rösmann
  *********************************************************************/
 
-#include "src/core/obstacles.h"
+#include "src/teb/obstacles.h"
 // #include <teb_local_planner/misc.h>
 
 namespace teb_demo

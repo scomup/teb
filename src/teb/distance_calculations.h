@@ -40,7 +40,7 @@
 #define DISTANCE_CALCULATIONS_H
 
 #include <Eigen/Core>
-#include "src/core/misc.h"
+#include "src/common/misc.h"
 
 
 namespace teb_demo

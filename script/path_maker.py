@@ -20,6 +20,7 @@ class GUI(object):
         self.fig, self.ax = plt.subplots()
         self.ax.set_xlim([-10,10])
         self.ax.set_ylim([-10,10])
+        self.cur_pose = [0,0]
         #self.ax.get_xaxis().set_visible(False)
         #self.ax.get_yaxis().set_visible(False)
 
@@ -38,21 +39,30 @@ class GUI(object):
 
         self.fig.canvas.mpl_connect('key_press_event', self.press)
         self.fig.canvas.mpl_connect('button_press_event', self.on_click)
+        self.fig.canvas.mpl_connect('button_release_event', self.on_release)
         
         plt.show()
 
     def on_click(self, event):
         if event.button == 1 and  event.inaxes == self.ax:
             if self.bpath_is_checked:
-                self.path.append([event.xdata, event.ydata])
+                self.cur_pose = [event.xdata, event.ydata]
             else:
                 self.obst.append([event.xdata, event.ydata])
-        self.update()
+                self.update()
+
+    def on_release(self, event):
+        if event.button == 1 and  event.inaxes == self.ax:
+            if self.bpath_is_checked:
+                vector = [event.xdata-self.cur_pose[0], event.ydata-self.cur_pose[1]]
+                theta = atan2(vector[1],vector[0])
+                self.path.append([self.cur_pose[0], self.cur_pose[1], theta])
+                self.update()
 
     def on_save(self, event):
         file = open("path.txt","w")
         for p in self.path:
-            fprintf(file, "PATH: %f %f\n", p[0],p[1]) 
+            fprintf(file, "PATH: %f %f %f\n", p[0],p[1],p[2]) 
         for o in self.obst:
             fprintf(file, "OBST: %f %f\n", o[0],o[1]) 
         print("save OK!")
@@ -63,16 +73,18 @@ class GUI(object):
         self.obst = []
         file = open("path.txt")
         lines = file.readlines()
+
         for line in lines:
-            txt = re.split(" ", line)
+            txt = re.split(r'\s+', line)
             if(txt[0] == 'PATH:'):
-                self.path.append([float(txt[1]), float(txt[2])])
+                self.path.append([float(txt[1]), float(txt[2]), float(txt[3])])
             if(txt[0] == 'OBST:'):
                 self.obst.append([float(txt[1]), float(txt[2])])
             if(txt[0] == 'PATH_NEW:'):
                 self.path_new.append([float(txt[1]), float(txt[2])])
         print("load OK!")
         self.update()
+
         file.close()
 
     def on_path(self, event):
@@ -107,7 +119,15 @@ class GUI(object):
         if len(self.path) != 0:
             path = np.array(self.path)
             self.ax.plot(path[:,0], path[:,1], c='b')
-            self.ax.scatter(path[:,0], path[:,1], c='b')
+            vec = []
+            for p in self.path:
+                c, s = np.cos(p[2]), np.sin(p[2])
+                R = np.matrix(((c,-s), (s, c)))
+                v = R*np.matrix([[1],[0]])
+                vec.append([v[0,0], v[1,0]])
+            vec = np.array(vec)
+            self.ax.quiver(path[:,0], path[:,1], vec[:,0], vec[:,1], color='b')
+            #self.ax.scatter(path[:,0], path[:,1], c='b')
 
         if len(self.path_new) != 0:
             path = np.array(self.path_new)

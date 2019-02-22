@@ -40,8 +40,8 @@
 #ifndef ROBOT_FOOTPRINT_MODEL_H
 #define ROBOT_FOOTPRINT_MODEL_H
 
-#include "src/core/pose_se2.h"
-#include "src/core/obstacles.h"
+#include "src/teb/pose_se2.h"
+#include "src/teb/obstacles.h"
 #include <visualization_msgs/Marker.h>
 
 namespace teb_demo

@@ -27,42 +27,48 @@
 // POSSIBILITY OF SUCH DAMAGE.
 //
 // Author: vitus@google.com (Michael Vitus)
-//
-// Defines the types used in the 2D pose graph SLAM formulation. Each vertex of
-// the graph has a unique integer ID with a position and orientation. There are
-// delta transformation constraints between two vertices.
 
-#ifndef CERES_EXAMPLES_POSE_GRAPH_2D_TYPES_H_
-#define CERES_EXAMPLES_POSE_GRAPH_2D_TYPES_H_
+#ifndef TEB_PLANNER_H_
+#define TEB_PLANNER_H_
 
-#include <fstream>
+#include "src/teb/obstacles.h"
+#include "src/teb/pose_se2.h"
 
-#include "Eigen/Core"
-#include "normalize_angle.h"
+namespace teb_demo
+{
 
-namespace teb_demo {
-
-// The state for each vertex in the pose graph.
-struct Pose2d {
-  double x;
-  double y;
-  double yaw_radians;
+struct OptimalConfig
+{
+  double max_vel_x_;
+  double max_acc_x_;
+  double dt_ref_;
+  double dt_hysteresis_;
+  int min_samples_;
+  int max_samples_;
 };
 
-// The state for each vertex in the pose graph.
-struct Obst2d {
-  double x;
-  double y;
+class OptimalPlanner
+{
+public:
+  OptimalPlanner();
+  void addPose(double x, double y, double angle);
+  void addObstacle(double x, double y);
+  void solve();
+
+private:
+  void autoResize(double dt_ref, double dt_hysteresis, int min_samples, int max_samples, bool fast_mode);
+  bool calcTimeDiff();
+  void addKinematicEdges(ceres::Problem &problem);
+  void addTimeEdges(ceres::Problem &problem);
+  void addVelocityEdges(ceres::Problem &problem);
+  void addObstacleEdges(ceres::Problem &problem);
+
+  std::vector<PoseSE2> poses_;
+  std::vector<Obstacle *> obstacles_;
+  std::vector<double> time_diffs_;
+  OptimalConfig *teb_config_;
 };
 
-std::istream& operator>>(std::istream& input, Pose2d& pose) {
-  input >> pose.x >> pose.y >> pose.yaw_radians;
-  // Normalize the angle between -pi to pi.
-  pose.yaw_radians = NormalizeAngle(pose.yaw_radians);
-  return input;
-}
+} // namespace teb_demo
 
-
-}  // namespace examples
-
-#endif  // CERES_EXAMPLES_POSE_GRAPH_2D_TYPES_H_
+#endif // CERES_EXAMPLES_POSE_GRAPH_2D_NORMALIZE_ANGLE_H_

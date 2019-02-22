@@ -20,7 +20,7 @@ find_package(PCL 1.8 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS iostreams)
 find_package(Ceres REQUIRED COMPONENTS SparseLinearAlgebraLibrary)
 find_package(Eigen3 REQUIRED)
-find_package(Pangolin REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 
 add_definitions(-DEIGEN_DONT_ALIGN_STATICALLY)
@@ -35,7 +35,7 @@ include_directories(${PCL_INCLUDE_DIRS})
 include_directories(${catkin_INCLUDE_DIRS})
 include_directories(${LUA_INCLUDE_DIR})
 include_directories(${CERES_INCLUDE_DIRS})
-include_directories(${Pangolin_INCLUDE_DIRS})
+include_directories(${YAML_CPP_INCLUDE_DIR})
 
 file(GLOB_RECURSE ALL_SRCS "*.cc")
 
@@ -51,7 +51,7 @@ ${catkin_LIBRARIES}
 ${Boost_LIBRARIES}
 ${PCL_LIBRARIES}
 ${CERES_LIBRARIES}
-${Pangolin_LIBRARIES}
+${YAML_CPP_LIBRARIES}
 Qt5::Widgets
 pthread
 dl

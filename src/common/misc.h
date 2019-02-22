@@ -1,100 +1,20 @@
-/*********************************************************************
- *
- * Software License Agreement (BSD License)
- *
- *  Copyright (c) 2016,
- *  TU Dortmund - Institute of Control Theory and Systems Engineering.
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above
- *     copyright notice, this list of conditions and the following
- *     disclaimer in the documentation and/or other materials provided
- *     with the distribution.
- *   * Neither the name of the institute nor the names of its
- *     contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- *  POSSIBILITY OF SUCH DAMAGE.
- *
- * Author: Christoph Rösmann
- *********************************************************************/
-
 #ifndef MISC_H
 #define MISC_H
 
 #include <Eigen/Core>
 #include <boost/utility.hpp>
 #include <boost/type_traits.hpp>
-
+#include "ceres/ceres.h"
 
 namespace teb_demo
 {
 
 #define SMALL_NUM 0.00000001
 
-//! Symbols for left/none/right rotations      
-enum class RotType { left, none, right };
-
-/** 
- * @brief Check whether two variables (double) are close to each other
- * @param a the first value to compare
- * @param b the second value to compare
- * @param epsilon precision threshold
- * @return \c true if |a-b| < epsilon, false otherwise
- */
-inline bool is_close(double a, double b, double epsilon = 1e-4) 
-{ 
-  return std::fabs(a - b) < epsilon; 
-}
-
-/** 
- * @brief Return the average angle of an arbitrary number of given angles [rad]
- * @param angles vector containing all angles
- * @return average / mean angle, that is normalized to [-pi, pi]
- */
-inline double average_angles(const std::vector<double>& angles)
+template <typename T>
+inline T fast_sigmoid(T x)
 {
-  double x=0, y=0;
-  for (std::vector<double>::const_iterator it = angles.begin(); it!=angles.end(); ++it)
-  {
-      x += cos(*it);
-      y += sin(*it);
-  }
-  if(x == 0 && y == 0)
-      return 0;
-  else
-      return std::atan2(y, x);
-}
-
-/** @brief Small helper function: check if |a|<|b| */
-inline bool smaller_than_abs(double i, double j) {return std::fabs(i)<std::fabs(j);}
-
-
-/**
- * @brief Calculate a fast approximation of a sigmoid function
- * @details The following function is implemented: \f$ x / (1 + |x|) \f$
- * @param x the argument of the function
-*/
-inline double fast_sigmoid(double x)
-{
-  return x / (1 + fabs(x));
+  return x / ( (T)1 + std::abs<T>(x));
 }
 
 /**
@@ -202,17 +122,20 @@ inline float rad2deg(float rad)
 /**
  * normalize the angle
  */
-inline float normalize_theta(float theta)
+template <typename T>
+inline T normalize_theta(T theta)
 {
-  if (theta >= -const_pi() && theta < const_pi())
+  const T pi = (T)const_pi();
+  const T two = (T)(2);
+  if (theta >= -pi && theta < pi)
     return theta;
   
-  float multiplier = std::floor(theta / (2*const_pi()));
-  theta = theta - multiplier*2*const_pi();
-  if (theta >= const_pi())
-    theta -= 2*const_pi();
-  if (theta < -const_pi())
-    theta += 2*const_pi();
+  T multiplier = ceres::floor(theta / (two*pi));
+  theta = theta - multiplier*two*pi;
+  if (theta >= pi)
+    theta -=two*pi;
+  if (theta < -pi)
+    theta += two*pi;
 
   return theta;
 }

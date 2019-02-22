@@ -10,7 +10,6 @@
 #include <sstream>
 #include <map>
 
-#include "src/core/types.h"
 
 class LogFile
 {
@@ -48,16 +47,16 @@ class LogFile
             auto v = split(line, ' ');
             if (v[0] == "PATH:")
             {
-                double x = std::stod(v[1]);
-                double y = std::stod(v[2]);
+                double x = std::stof(v[1]);
+                double y = std::stof(v[2]);
                 double yaw = 0;
-                paths_.push_back(teb_demo::Pose2d{x,y,yaw});
+                paths_.push_back({x,y,yaw});
             }
             else if (v[0] == "OBST:")
             {
-                double x = std::stod(v[1]);
-                double y = std::stod(v[2]);
-                obsts_.push_back(teb_demo::Obst2d{x,y});
+                double x = std::stof(v[1]);
+                double y = std::stof(v[2]);
+                obsts_.push_back({x,y});
             }
             else
             {
@@ -68,12 +67,12 @@ class LogFile
     }
 
     //std::map<int, sample_carto::transform::Rigid3d>& nodes(){return nodes_;}
-    std::vector<teb_demo::Pose2d>& paths(){return paths_;}
-    std::vector<teb_demo::Obst2d>& obsts(){return obsts_;}
+    std::vector<std::array<double,3>>& paths(){return paths_;}
+    std::vector<std::array<double,2>>& obsts(){return obsts_;}
 
   private:
-    std::vector<teb_demo::Pose2d> paths_;
-    std::vector<teb_demo::Obst2d> obsts_;
+    std::vector<std::array<double,3>> paths_;
+    std::vector<std::array<double,2>> obsts_;
 };
 
 #endif // G2O_IO_H_
