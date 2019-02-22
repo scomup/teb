@@ -33,6 +33,7 @@
 
 #include "src/teb/obstacles.h"
 #include "src/teb/pose_se2.h"
+#include "src/teb/robot_footprint_model.h"
 #include "yaml-cpp/yaml.h"
 
 namespace teb_demo
@@ -55,6 +56,7 @@ private:
   void addTimeEdges(ceres::Problem &problem);
   void addVelocityEdges(ceres::Problem &problem);
   void addObstacleEdges(ceres::Problem &problem);
+  BaseRobotFootprintModel* createRobotFootprint();
 
   std::vector<PoseSE2> poses_;
   std::vector<Obstacle *> obstacles_;

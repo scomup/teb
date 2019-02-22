@@ -14,8 +14,8 @@
 namespace teb_demo
 {
 
-OptimalPlanner::OptimalPlanner(YAML::Node* config)
-: config_(config){}
+OptimalPlanner::OptimalPlanner(YAML::Node *config)
+    : config_(config) {}
 
 void OptimalPlanner::autoResize(double dt_ref, double dt_hysteresis, int min_samples, int max_samples, bool fast_mode)
 {
@@ -61,7 +61,6 @@ bool OptimalPlanner::calcTimeDiff()
 {
   double max_vel_x = (*config_)["max_vel_x"].as<double>();
   double max_acc_x = (*config_)["max_vel_x"].as<double>();
-
 
   if (poses_.size() < 2)
     return false;
@@ -193,6 +192,52 @@ void OptimalPlanner::addVelocityEdges(ceres::Problem &problem)
   }
 }
 
+BaseRobotFootprintModel *OptimalPlanner::createRobotFootprint()
+{
+
+  const YAML::Node &footprint_model_conifg = (*config_)["footprint_model"];
+  std::string model_name = footprint_model_conifg["type"].as<std::string>();
+
+  if (model_name.compare("point") == 0)
+  {
+    return new PointRobotFootprint();
+  }
+  // circular
+  if (model_name.compare("circular") == 0)
+  {
+    printf("%s, unimplemented!\n", model_name.c_str());
+    exit(0);
+  }
+  // line
+  if (model_name.compare("line") == 0)
+  {
+    printf("%s, unimplemented!\n", model_name.c_str());
+    exit(0);
+  }
+  // two circles
+  if (model_name.compare("two_circles") == 0)
+  {
+    printf("%s, unimplemented!\n", model_name.c_str());
+    exit(0);
+  }
+  // polygon
+  if (model_name.compare("polygon") == 0)
+  {
+    Point2dContainer polygon;
+    const YAML::Node &vertices = footprint_model_conifg["vertices"];
+    for (std::size_t i = 0; i < vertices.size(); i++)
+    {
+      const YAML::Node &point = vertices[i];
+      polygon.emplace_back(point[0].as<double>(), point[1].as<double>());
+    }
+    return new PolygonRobotFootprint(polygon);
+  }
+  printf("%s, unimplemented!\n", model_name.c_str());
+  exit(0);
+
+  return nullptr;
+}
+
 void OptimalPlanner::addObstacleEdges(ceres::Problem &problem)
 {
 
@@ -202,8 +247,7 @@ void OptimalPlanner::addObstacleEdges(ceres::Problem &problem)
 
   Eigen::Matrix<double, 1, 1> information;
   information << weight_obstacle;
-
-  BaseRobotFootprintModel *robot = new PointRobotFootprint;
+  BaseRobotFootprintModel *robot = createRobotFootprint();
 
   for (size_t i = 0; i < obstacles_.size(); i++)
   {
@@ -218,7 +262,7 @@ void OptimalPlanner::addObstacleEdges(ceres::Problem &problem)
       auto &current = poses_[j];
       double dist = obstacles_[i]->getMinimumDistance(current.position());
 
-      if (dist > 2.5*min_obstacle_dist)
+      if (dist > 2.5 * min_obstacle_dist)
         continue;
 
       problem.AddResidualBlock(cost_function, NULL,
@@ -231,7 +275,6 @@ void OptimalPlanner::addObstacleEdges(ceres::Problem &problem)
 
 void OptimalPlanner::solve()
 {
-  char src[200];
   bool autosize = (*config_)["autosize"].as<bool>();
 
   if (autosize)
@@ -253,46 +296,37 @@ void OptimalPlanner::solve()
   ceres::Problem::EvaluateOptions evaluate_options;
   double total_cost = 0.0;
   std::vector<double> residuals;
-  //problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
-  //std::cout << "before total_cost:" << total_cost << "\n";
+  problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
+  std::cout << "Initial total cost:" << total_cost << "\n";
 
   ceres::Solver::Options options;
   options.max_num_iterations = 100;
   options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
 
-  for (auto &current : poses_)
-  {
-    sprintf(src, "PATH: %5.2f %5.2f %5.2f\r\n", current.x(), current.y(), normalize_theta(current.theta()));
-    std::cout<< src;
-  }
-std::cout<< std::endl<< std::endl<< std::endl;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
-  //problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
-  //std::cout << "after total_cost:" << total_cost << "\n";
+  problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
+  std::cout << "Finial total cost:" << total_cost << "\n";
 
   std::ofstream myfile;
+  char src[200];
+
   myfile.open("/home/liu/workspace/teb/script/new_path.txt");
   for (auto &current : poses_)
   {
-    sprintf(src, "PATH: %5.2f %5.2f %5.2f\r\n", current.x(), current.y(), normalize_theta(current.theta()));
-    std::cout<< src;
+    sprintf(src, "PATH: %5.2lf %5.2lf %5.2lf\r\n", current.x(), current.y(), normalize_theta(current.theta()));
     myfile << src;
   }
-  
 
   for (auto &current : obstacles_)
   {
     auto &pose = current->getCentroid();
 
-    sprintf(src, "OBST: %5.2f %5.2f %5.2f\r\n", pose.x(), pose.y());
-    std::cout<< src;
-
+    sprintf(src, "OBST: %5.2lf %5.2lf\r\n", pose.x(), pose.y());
     myfile << src;
   }
-
   myfile.close();
 }
 
-}
+} // namespace teb_demo

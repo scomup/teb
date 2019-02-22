@@ -9,8 +9,9 @@ from matplotlib.widgets import Button
 import itertools
 import re
 import subprocess
-
+import yaml
 import sys
+
 def fprintf(stream, format_spec, *args):
     stream.write(format_spec % args)
 
@@ -18,11 +19,9 @@ class GUI(object):
     def __init__(self):
         self.idx = 0
         self.fig, self.ax = plt.subplots()
-        self.ax.set_xlim([-10,10])
+        self.ax.set_xlim([-18,18])
         self.ax.set_ylim([-10,10])
         self.cur_pose = [0,0]
-        #self.ax.get_xaxis().set_visible(False)
-        #self.ax.get_yaxis().set_visible(False)
 
         self.path = []
         self.path_new = []
@@ -34,6 +33,9 @@ class GUI(object):
         self.bpath = Button(plt.axes([0.35, 0.002, 0.12, 0.045]), 'draw path')
         self.bpath.on_clicked(self.on_path)
         self.bpath_is_checked = True
+        self.bpath.color = 'green'
+        self.bpath.hovercolor = self.bpath.color
+        self.bpath.ax.set_facecolor(self.bpath.color)
 
         self.bsave = Button(plt.axes([0.50, 0.002, 0.12, 0.045]), 'save')
         self.bsave.on_clicked(self.on_save)
@@ -47,8 +49,18 @@ class GUI(object):
         self.fig.canvas.mpl_connect('key_press_event', self.press)
         self.fig.canvas.mpl_connect('button_press_event', self.on_click)
         self.fig.canvas.mpl_connect('button_release_event', self.on_release)
-        
+
+        self.load_config()
         plt.show()
+
+    def load_config(self):
+        config_file = open("/home/liu/workspace/teb/config/sample.yaml", "r")
+        config = yaml.load(config_file)
+        self.min_dist = config["min_obstacle_dist"]  
+        self.model_name = config["footprint_model"]["type"]
+        self.polygon = np.matrix(config["footprint_model"]["vertices"])
+
+
 
     def on_clear(self, event):
         self.path = []
@@ -56,7 +68,7 @@ class GUI(object):
         self.update()
 
     def on_run(self, event):
-        self.save("path.txt")
+        #self.save("path.txt")
         subprocess.call(["/home/liu/workspace/teb/build/teb_demo"])
         self.load("new_path.txt")
         self.update()
@@ -98,6 +110,7 @@ class GUI(object):
         
 
     def load(self, file_name):
+        self.load_config()
         self.path = []
         self.obst = []
         file = open(file_name)
@@ -115,15 +128,15 @@ class GUI(object):
     def on_path(self, event):
         if(self.bpath_is_checked == True):
             self.bpath_is_checked = False
-            self.bpath.color = 'green'
-            self.bpath.label.set_text("draw obst") # works
+            self.bpath.color = 'blue'
+            self.bpath.label.set_text("draw obst") 
 
             #self.bpath.name = 'draw path'
         else:
             self.bpath_is_checked == False
             self.bpath_is_checked = True
-            self.bpath.color = 'white'
-            self.bpath.label.set_text("draw path") # works
+            self.bpath.color = 'green'
+            self.bpath.label.set_text("draw path")
             #self.bpath.name = 'draw obst'
         self.bpath.hovercolor = self.bpath.color
         self.bpath.ax.set_facecolor(self.bpath.color)
@@ -139,21 +152,25 @@ class GUI(object):
             
     def update(self):
         self.ax.cla()
-        self.ax.set_xlim([-10,10])
+        self.ax.set_xlim([-18,18])
         self.ax.set_ylim([-10,10])
 
         if len(self.path) != 0:
             path = np.array(self.path)
-            self.ax.plot(path[:,0], path[:,1], c='b')
+            self.ax.plot(path[:,0], path[:,1], c='g',linewidth=0.5)
             vec = []
             for p in self.path:
                 c, s = np.cos(p[2]), np.sin(p[2])
                 R = np.matrix(((c,-s), (s, c)))
                 v = R*np.matrix([[1],[0]])
                 vec.append([v[0,0], v[1,0]])
+                R = np.matrix(((c,-s), (s, c)))
+                polygon = R * np.matrix(self.polygon.transpose())
+                polygon = polygon.transpose()
+                polygon = polygon + np.tile( np.array([p[0], p[1]]), (self.polygon.shape[0], 1))
+                self.ax.add_patch(plt.Polygon(polygon, color='g', alpha=0.1))
             vec = np.array(vec)
-            self.ax.quiver(path[:,0], path[:,1], vec[:,0], vec[:,1], color='b')
-            #self.ax.scatter(path[:,0], path[:,1], c='b')
+            self.ax.quiver(path[:,0], path[:,1], vec[:,0], vec[:,1], color='g',width=0.001, scale= 30)
 
         if len(self.path_new) != 0:
             path = np.array(self.path_new)
@@ -162,8 +179,9 @@ class GUI(object):
 
         if len(self.obst) != 0:
             obst = np.array(self.obst)
-            self.ax.scatter(obst[:,0], obst[:,1], c='k', s = 1000)
-
+            self.ax.scatter(obst[:,0], obst[:,1], c='b')
+            for o in obst:
+                self.ax.add_patch(plt.Circle((o[0], o[1]), self.min_dist, color='b', alpha=0.1))
 
         plt.draw()
 
