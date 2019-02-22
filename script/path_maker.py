@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 import itertools
 import re
+import subprocess
 
 import sys
 def fprintf(stream, format_spec, *args):
@@ -15,7 +16,6 @@ def fprintf(stream, format_spec, *args):
 
 class GUI(object):
     def __init__(self):
-        print "!You can use keyboard(left/right) or botton to play bag file."
         self.idx = 0
         self.fig, self.ax = plt.subplots()
         self.ax.set_xlim([-10,10])
@@ -27,21 +27,39 @@ class GUI(object):
         self.path = []
         self.path_new = []
         self.obst = []
-        self.bpath = Button(plt.axes([0.35, 0.002, 0.15, 0.045]), 'path/obst')
-        self.bpath.on_clicked(self.on_path)
-        self.bpath_is_checked = False
 
-        self.bsave = Button(plt.axes([0.55, 0.002, 0.15, 0.045]), 'save')
+        self.bclear = Button(plt.axes([0.00, 0.002, 0.12, 0.045]), 'clear')
+        self.bclear.on_clicked(self.on_clear)
+
+        self.bpath = Button(plt.axes([0.35, 0.002, 0.12, 0.045]), 'draw path')
+        self.bpath.on_clicked(self.on_path)
+        self.bpath_is_checked = True
+
+        self.bsave = Button(plt.axes([0.50, 0.002, 0.12, 0.045]), 'save')
         self.bsave.on_clicked(self.on_save)
         
-        self.bload = Button(plt.axes([0.75, 0.002, 0.15, 0.045]), 'load')
+        self.bload = Button(plt.axes([0.65, 0.002, 0.12, 0.045]), 'load')
         self.bload.on_clicked(self.on_load)
+
+        self.brun = Button(plt.axes([0.80, 0.002, 0.12, 0.045]), 'run')
+        self.brun.on_clicked(self.on_run)
 
         self.fig.canvas.mpl_connect('key_press_event', self.press)
         self.fig.canvas.mpl_connect('button_press_event', self.on_click)
         self.fig.canvas.mpl_connect('button_release_event', self.on_release)
         
         plt.show()
+
+    def on_clear(self, event):
+        self.path = []
+        self.obst = []
+        self.update()
+
+    def on_run(self, event):
+        self.save("path.txt")
+        subprocess.call(["/home/liu/workspace/teb/build/teb_demo"])
+        self.load("new_path.txt")
+        self.update()
 
     def on_click(self, event):
         if event.button == 1 and  event.inaxes == self.ax:
@@ -60,20 +78,30 @@ class GUI(object):
                 self.update()
 
     def on_save(self, event):
-        file = open("path.txt","w")
+        self.save("path.txt")
+        print("save OK!")
+
+    def save(self, file_name):
+        file = open(file_name,"w")
         for p in self.path:
             fprintf(file, "PATH: %f %f %f\n", p[0],p[1],p[2]) 
         for o in self.obst:
             fprintf(file, "OBST: %f %f\n", o[0],o[1]) 
-        print("save OK!")
+            
         file.close()
 
     def on_load(self, event):
         self.path = []
         self.obst = []
-        file = open("path.txt")
-        lines = file.readlines()
+        self.load("path.txt")
+        self.update()
+        
 
+    def load(self, file_name):
+        self.path = []
+        self.obst = []
+        file = open(file_name)
+        lines = file.readlines()
         for line in lines:
             txt = re.split(r'\s+', line)
             if(txt[0] == 'PATH:'):
@@ -82,21 +110,19 @@ class GUI(object):
                 self.obst.append([float(txt[1]), float(txt[2])])
             if(txt[0] == 'PATH_NEW:'):
                 self.path_new.append([float(txt[1]), float(txt[2])])
-        print("load OK!")
-        self.update()
-
         file.close()
 
     def on_path(self, event):
         if(self.bpath_is_checked == True):
             self.bpath_is_checked = False
-            self.bpath.color = 'white'
+            self.bpath.color = 'green'
             self.bpath.label.set_text("draw obst") # works
+
             #self.bpath.name = 'draw path'
         else:
             self.bpath_is_checked == False
             self.bpath_is_checked = True
-            self.bpath.color = 'green'
+            self.bpath.color = 'white'
             self.bpath.label.set_text("draw path") # works
             #self.bpath.name = 'draw obst'
         self.bpath.hovercolor = self.bpath.color

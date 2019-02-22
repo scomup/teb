@@ -1,0 +1,27 @@
+ # Trajectory
+ autosize: True
+ dt_ref: 0.3
+ dt_hysteresis: 0.1
+ min_samples: 3
+ max_samples: 500
+
+ # Robot
+ max_vel_x: 0.35
+ max_vel_x_backwards: 0.1
+
+ acc_lim_x: 0.5
+ acc_lim_theta: 0.1
+
+ # Obstacles
+ min_obstacle_dist: 2 # This value must also include our robot radius, since footprint_model is set to "point".
+
+ # Optimization
+    
+ penalty_epsilon: 0.1
+ weight_max_vel_x: 200
+ weight_max_vel_theta: 10
+ weight_kinematics_nh: 100
+ weight_kinematics_forward_drive: 1
+ weight_optimaltime: 1
+ weight_obstacle: 10
+ 

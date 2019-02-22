@@ -33,24 +33,17 @@
 
 #include "src/teb/obstacles.h"
 #include "src/teb/pose_se2.h"
+#include "yaml-cpp/yaml.h"
 
 namespace teb_demo
 {
 
-struct OptimalConfig
-{
-  double max_vel_x_;
-  double max_acc_x_;
-  double dt_ref_;
-  double dt_hysteresis_;
-  int min_samples_;
-  int max_samples_;
-};
+
 
 class OptimalPlanner
 {
 public:
-  OptimalPlanner();
+  OptimalPlanner(YAML::Node* config);
   void addPose(double x, double y, double angle);
   void addObstacle(double x, double y);
   void solve();
@@ -66,7 +59,7 @@ private:
   std::vector<PoseSE2> poses_;
   std::vector<Obstacle *> obstacles_;
   std::vector<double> time_diffs_;
-  OptimalConfig *teb_config_;
+  YAML::Node* config_;
 };
 
 } // namespace teb_demo

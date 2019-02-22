@@ -49,7 +49,7 @@ class LogFile
             {
                 double x = std::stof(v[1]);
                 double y = std::stof(v[2]);
-                double yaw = 0;
+                double yaw = std::stof(v[3]);
                 paths_.push_back({x,y,yaw});
             }
             else if (v[0] == "OBST:")

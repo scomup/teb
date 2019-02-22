@@ -14,16 +14,8 @@
 namespace teb_demo
 {
 
-OptimalPlanner::OptimalPlanner()
-{
-  teb_config_ = new OptimalConfig;
-  teb_config_->max_vel_x_ = 0.2;
-  teb_config_->max_acc_x_ = 1;
-  teb_config_->dt_ref_ = 0.3;
-  teb_config_->dt_hysteresis_ = 0.1;
-  teb_config_->min_samples_ = 3;
-  teb_config_->max_samples_ = 500;
-}
+OptimalPlanner::OptimalPlanner(YAML::Node* config)
+: config_(config){}
 
 void OptimalPlanner::autoResize(double dt_ref, double dt_hysteresis, int min_samples, int max_samples, bool fast_mode)
 {
@@ -67,6 +59,9 @@ void OptimalPlanner::autoResize(double dt_ref, double dt_hysteresis, int min_sam
 
 bool OptimalPlanner::calcTimeDiff()
 {
+  double max_vel_x = (*config_)["max_vel_x"].as<double>();
+  double max_acc_x = (*config_)["max_vel_x"].as<double>();
+
 
   if (poses_.size() < 2)
     return false;
@@ -74,14 +69,14 @@ bool OptimalPlanner::calcTimeDiff()
   auto &prev = poses_[poses_.size() - 2];
   Eigen::Vector2d diff_last = curr.position() - prev.position();
   double diff_norm = diff_last.norm();
-  double timestep_vel = diff_norm / teb_config_->max_vel_x_; // constant velocity
+  double timestep_vel = diff_norm / max_vel_x; // constant velocity
   double timestep_acc;
   double timestep = 1;
 
-  if (teb_config_->max_acc_x_ != 0)
+  if (max_acc_x != 0)
   {
-    timestep_acc = sqrt(2 * diff_norm / (teb_config_->max_acc_x_)); // constant acceleration
-    if (timestep_vel < timestep_acc && teb_config_->max_acc_x_)
+    timestep_acc = sqrt(2 * diff_norm / (max_acc_x)); // constant acceleration
+    if (timestep_vel < timestep_acc && max_acc_x)
       timestep = timestep_acc;
     else
       timestep = timestep_vel;
@@ -113,8 +108,12 @@ void OptimalPlanner::addObstacle(double x, double y)
 
 void OptimalPlanner::addKinematicEdges(ceres::Problem &problem)
 {
+
+  double weight_kinematics_nh = (*config_)["weight_kinematics_nh"].as<double>();
+  double weight_kinematics_forward_drive = (*config_)["weight_kinematics_forward_drive"].as<double>();
+
   Eigen::Matrix2d information;
-  information << 100, 0, 0, 1;
+  information << weight_kinematics_nh, 0, 0, weight_kinematics_forward_drive;
   //add kinematics edges
   for (size_t i = 0; i < poses_.size() - 1; i++)
   {
@@ -151,8 +150,10 @@ void OptimalPlanner::addKinematicEdges(ceres::Problem &problem)
 
 void OptimalPlanner::addTimeEdges(ceres::Problem &problem)
 {
+  double weight_optimaltime = (*config_)["weight_optimaltime"].as<double>();
+
   Eigen::Matrix<double, 1, 1> information;
-  information << 10;
+  information << weight_optimaltime;
 
   for (size_t i = 0; i < time_diffs_.size(); i++)
   {
@@ -166,8 +167,11 @@ void OptimalPlanner::addTimeEdges(ceres::Problem &problem)
 
 void OptimalPlanner::addVelocityEdges(ceres::Problem &problem)
 {
+  double weight_max_vel_x = (*config_)["weight_max_vel_x"].as<double>();
+  double weight_max_vel_theta = (*config_)["weight_max_vel_theta"].as<double>();
+
   Eigen::Matrix2d information;
-  information << 1000, 0, 0, 100;
+  information << weight_max_vel_x, 0, 0, weight_max_vel_theta;
   //add kinematics edges
   for (size_t i = 0; i < time_diffs_.size(); i++)
   {
@@ -191,23 +195,32 @@ void OptimalPlanner::addVelocityEdges(ceres::Problem &problem)
 
 void OptimalPlanner::addObstacleEdges(ceres::Problem &problem)
 {
+
+  double weight_obstacle = (*config_)["weight_obstacle"].as<double>();
+  double penalty_epsilon = (*config_)["penalty_epsilon"].as<double>();
+  double min_obstacle_dist = (*config_)["min_obstacle_dist"].as<double>();
+
   Eigen::Matrix<double, 1, 1> information;
-  information << 100;
+  information << weight_obstacle;
 
   BaseRobotFootprintModel *robot = new PointRobotFootprint;
 
   for (size_t i = 0; i < obstacles_.size(); i++)
   {
-    ceres::CostFunction *cost_function = ObstacleError::Create(information, robot, obstacles_[i]);
+    ceres::CostFunction *cost_function =
+        ObstacleError::Create(information,
+                              robot, obstacles_[i],
+                              min_obstacle_dist,
+                              penalty_epsilon);
 
     for (size_t j = 0; j < poses_.size(); j++)
     {
       auto &current = poses_[j];
       double dist = obstacles_[i]->getMinimumDistance(current.position());
-      //if (dist > 1)
-      //  continue;
 
-      //std::cout << current.x() << "," << current.y() << "," << current.theta() << "\n";
+      if (dist > 2.5*min_obstacle_dist)
+        continue;
+
       problem.AddResidualBlock(cost_function, NULL,
                                &current.x(),
                                &current.y(),
@@ -218,7 +231,17 @@ void OptimalPlanner::addObstacleEdges(ceres::Problem &problem)
 
 void OptimalPlanner::solve()
 {
-  autoResize(teb_config_->dt_ref_, teb_config_->dt_hysteresis_, teb_config_->min_samples_, teb_config_->max_samples_, false);
+  char src[200];
+  bool autosize = (*config_)["autosize"].as<bool>();
+
+  if (autosize)
+  {
+    double dt_ref = (*config_)["dt_ref"].as<double>();
+    double dt_hysteresis = (*config_)["dt_hysteresis"].as<double>();
+    int min_samples = (*config_)["min_samples"].as<int>();
+    int max_samples = (*config_)["max_samples"].as<int>();
+    autoResize(dt_ref, dt_hysteresis, min_samples, max_samples, false);
+  }
 
   ceres::Problem problem;
 
@@ -237,6 +260,12 @@ void OptimalPlanner::solve()
   options.max_num_iterations = 100;
   options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
 
+  for (auto &current : poses_)
+  {
+    sprintf(src, "PATH: %5.2f %5.2f %5.2f\r\n", current.x(), current.y(), normalize_theta(current.theta()));
+    std::cout<< src;
+  }
+std::cout<< std::endl<< std::endl<< std::endl;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
@@ -244,21 +273,22 @@ void OptimalPlanner::solve()
   //std::cout << "after total_cost:" << total_cost << "\n";
 
   std::ofstream myfile;
-  myfile.open("/home/liu/workspace/teb/script/path.txt");
-  char src[200];
+  myfile.open("/home/liu/workspace/teb/script/new_path.txt");
   for (auto &current : poses_)
   {
     sprintf(src, "PATH: %5.2f %5.2f %5.2f\r\n", current.x(), current.y(), normalize_theta(current.theta()));
-    //std::std::cout<< src;
+    std::cout<< src;
     myfile << src;
   }
+  
 
   for (auto &current : obstacles_)
   {
     auto &pose = current->getCentroid();
 
     sprintf(src, "OBST: %5.2f %5.2f %5.2f\r\n", pose.x(), pose.y());
-    //std::std::cout<< src;
+    std::cout<< src;
+
     myfile << src;
   }
 
