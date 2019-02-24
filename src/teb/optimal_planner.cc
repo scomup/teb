@@ -1,6 +1,7 @@
 #include <cmath>
 #include "ceres/ceres.h"
-#include "src/teb/error/kinematics_error.h"
+#include "src/teb/error/kinematics_diff_drvie_error.h"
+#include "src/teb/error/kinematics_car_like_error.h"
 #include "src/teb/error/obstacle_error.h"
 #include "src/teb/error/velocity_error.h"
 #include "src/teb/error/time_error.h"
@@ -15,7 +16,33 @@ namespace teb_demo
 {
 
 OptimalPlanner::OptimalPlanner(YAML::Node *config)
-    : config_(config) {}
+    : config_(config)
+{
+  autosize_ = (*config_)["autosize"].as<bool>();
+  dt_ref_ = (*config_)["dt_ref"].as<double>();
+  dt_hysteresis_ = (*config_)["dt_hysteresis"].as<double>();
+  min_samples_ = (*config_)["min_samples"].as<int>();
+  max_samples_ = (*config_)["max_samples"].as<int>();
+
+  max_vel_x_ = (*config_)["max_vel_x"].as<double>();
+  max_vel_x_backwards_ = (*config_)["max_vel_x_backwards"].as<double>();
+  max_vel_theta_ = (*config_)["max_vel_theta"].as<double>();
+  acc_lim_x_ = (*config_)["acc_lim_x"].as<double>();
+  acc_lim_theta_ = (*config_)["acc_lim_theta"].as<double>();
+  min_turning_radius_ = (*config_)["min_turning_radius"].as<double>();
+  robot_model_ = createRobotFootprint();
+
+  min_obstacle_dist_ = (*config_)["min_obstacle_dist"].as<double>();
+
+  penalty_epsilon_ = (*config_)["penalty_epsilon"].as<double>();
+  weight_max_vel_x_ = (*config_)["weight_max_vel_x"].as<double>();
+  weight_max_vel_theta_ = (*config_)["weight_max_vel_theta"].as<double>();
+  weight_kinematics_nh_ = (*config_)["weight_kinematics_nh"].as<double>();
+  weight_kinematics_forward_drive_ = (*config_)["weight_kinematics_forward_drive"].as<double>();
+  weight_kinematics_turning_radius_ = (*config_)["weight_kinematics_turning_radius"].as<double>();
+  weight_optimaltime_ = (*config_)["weight_optimaltime"].as<double>();
+  weight_obstacle_ = (*config_)["weight_obstacle"].as<double>();
+}
 
 void OptimalPlanner::autoResize(double dt_ref, double dt_hysteresis, int min_samples, int max_samples, bool fast_mode)
 {
@@ -59,18 +86,17 @@ void OptimalPlanner::autoResize(double dt_ref, double dt_hysteresis, int min_sam
 
 bool OptimalPlanner::calcTimeDiff()
 {
-  double max_vel_x = (*config_)["max_vel_x"].as<double>();
-  double max_acc_x = (*config_)["max_vel_x"].as<double>();
-
   if (poses_.size() < 2)
     return false;
   auto &curr = poses_.back();
   auto &prev = poses_[poses_.size() - 2];
   Eigen::Vector2d diff_last = curr.position() - prev.position();
   double diff_norm = diff_last.norm();
-  double timestep_vel = diff_norm / max_vel_x; // constant velocity
+  double timestep_vel = diff_norm / max_vel_x_; // constant velocity
   double timestep_acc;
   double timestep = 1;
+
+  double max_acc_x = acc_lim_x_;
 
   if (max_acc_x != 0)
   {
@@ -107,20 +133,25 @@ void OptimalPlanner::addObstacle(double x, double y)
 
 void OptimalPlanner::addKinematicEdges(ceres::Problem &problem)
 {
-
-  double weight_kinematics_nh = (*config_)["weight_kinematics_nh"].as<double>();
-  double weight_kinematics_forward_drive = (*config_)["weight_kinematics_forward_drive"].as<double>();
-
   Eigen::Matrix2d information;
-  information << weight_kinematics_nh, 0, 0, weight_kinematics_forward_drive;
+  
   //add kinematics edges
   for (size_t i = 0; i < poses_.size() - 1; i++)
   {
 
     auto &current = poses_[i];
     auto &next = poses_[i + 1];
-
-    ceres::CostFunction *cost_function = KinematicsError::Create(information);
+    ceres::CostFunction *cost_function;
+    if (min_turning_radius_ == 0 || weight_kinematics_turning_radius_ == 0)
+    {
+      information << weight_kinematics_nh_, 0, 0, weight_kinematics_forward_drive_;
+      cost_function = KinematicsDiffDriveError::Create(information);
+    }
+    else
+    {
+      information << weight_kinematics_nh_, 0, 0, weight_kinematics_turning_radius_;
+      cost_function = KinematicsCarLikeError::Create(information, min_turning_radius_);
+    }
 
     problem.AddResidualBlock(cost_function, nullptr,
                              &current.x(),
@@ -149,10 +180,8 @@ void OptimalPlanner::addKinematicEdges(ceres::Problem &problem)
 
 void OptimalPlanner::addTimeEdges(ceres::Problem &problem)
 {
-  double weight_optimaltime = (*config_)["weight_optimaltime"].as<double>();
-
   Eigen::Matrix<double, 1, 1> information;
-  information << weight_optimaltime;
+  information << weight_optimaltime_;
 
   for (size_t i = 0; i < time_diffs_.size(); i++)
   {
@@ -166,11 +195,8 @@ void OptimalPlanner::addTimeEdges(ceres::Problem &problem)
 
 void OptimalPlanner::addVelocityEdges(ceres::Problem &problem)
 {
-  double weight_max_vel_x = (*config_)["weight_max_vel_x"].as<double>();
-  double weight_max_vel_theta = (*config_)["weight_max_vel_theta"].as<double>();
-
   Eigen::Matrix2d information;
-  information << weight_max_vel_x, 0, 0, weight_max_vel_theta;
+  information << weight_max_vel_x_, 0, 0, weight_max_vel_theta_;
   //add kinematics edges
   for (size_t i = 0; i < time_diffs_.size(); i++)
   {
@@ -179,7 +205,11 @@ void OptimalPlanner::addVelocityEdges(ceres::Problem &problem)
     auto &next = poses_[i + 1];
     auto &dt = time_diffs_[i];
 
-    ceres::CostFunction *cost_function = VelocityError::Create(information);
+    ceres::CostFunction *cost_function = VelocityError::Create(information,
+                                                               max_vel_x_backwards_,
+                                                               max_vel_x_,
+                                                               max_vel_theta_,
+                                                               penalty_epsilon_);
 
     problem.AddResidualBlock(cost_function, nullptr,
                              &current.x(),
@@ -194,7 +224,6 @@ void OptimalPlanner::addVelocityEdges(ceres::Problem &problem)
 
 BaseRobotFootprintModel *OptimalPlanner::createRobotFootprint()
 {
-
   const YAML::Node &footprint_model_conifg = (*config_)["footprint_model"];
   std::string model_name = footprint_model_conifg["type"].as<std::string>();
 
@@ -240,29 +269,24 @@ BaseRobotFootprintModel *OptimalPlanner::createRobotFootprint()
 
 void OptimalPlanner::addObstacleEdges(ceres::Problem &problem)
 {
-
-  double weight_obstacle = (*config_)["weight_obstacle"].as<double>();
-  double penalty_epsilon = (*config_)["penalty_epsilon"].as<double>();
-  double min_obstacle_dist = (*config_)["min_obstacle_dist"].as<double>();
-
   Eigen::Matrix<double, 1, 1> information;
-  information << weight_obstacle;
-  BaseRobotFootprintModel *robot = createRobotFootprint();
+  information << weight_obstacle_;
 
   for (size_t i = 0; i < obstacles_.size(); i++)
   {
     ceres::CostFunction *cost_function =
         ObstacleError::Create(information,
-                              robot, obstacles_[i],
-                              min_obstacle_dist,
-                              penalty_epsilon);
+                              robot_model_,
+                              obstacles_[i],
+                              min_obstacle_dist_,
+                              penalty_epsilon_);
 
     for (size_t j = 0; j < poses_.size(); j++)
     {
       auto &current = poses_[j];
       double dist = obstacles_[i]->getMinimumDistance(current.position());
 
-      if (dist > 2.5 * min_obstacle_dist)
+      if (dist > 2.5 * min_obstacle_dist_)
         continue;
 
       problem.AddResidualBlock(cost_function, NULL,
@@ -275,15 +299,10 @@ void OptimalPlanner::addObstacleEdges(ceres::Problem &problem)
 
 void OptimalPlanner::solve()
 {
-  bool autosize = (*config_)["autosize"].as<bool>();
 
-  if (autosize)
+  if (autosize_)
   {
-    double dt_ref = (*config_)["dt_ref"].as<double>();
-    double dt_hysteresis = (*config_)["dt_hysteresis"].as<double>();
-    int min_samples = (*config_)["min_samples"].as<int>();
-    int max_samples = (*config_)["max_samples"].as<int>();
-    autoResize(dt_ref, dt_hysteresis, min_samples, max_samples, false);
+    autoResize(dt_ref_, dt_hysteresis_, min_samples_, max_samples_, false);
   }
 
   ceres::Problem problem;
@@ -298,7 +317,7 @@ void OptimalPlanner::solve()
   std::vector<double> residuals;
   problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
   std::cout << "Initial total cost:" << total_cost << "\n";
-
+/*
   ceres::Solver::Options options;
   options.max_num_iterations = 100;
   options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
@@ -326,7 +345,7 @@ void OptimalPlanner::solve()
     sprintf(src, "OBST: %5.2lf %5.2lf\r\n", pose.x(), pose.y());
     myfile << src;
   }
-  myfile.close();
+  myfile.close();*/
 }
 
 } // namespace teb_demo

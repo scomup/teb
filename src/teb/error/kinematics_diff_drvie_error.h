@@ -1,7 +1,7 @@
 
 
-#ifndef TEB_KINEMATICES_ERROR_PLANNER_H_
-#define TEB_KINEMATICES_ERROR_PLANNER_H_
+#ifndef TEB_KINEMATICES_DIFF_DRIVE_ERROR_PLANNER_H_
+#define TEB_KINEMATICES_DIFF_DRIVE_ERROR_PLANNER_H_
 
 #include <cmath>
 #include "ceres/ceres.h"
@@ -11,10 +11,10 @@
 namespace teb_demo
 {
 
-class KinematicsError
+class KinematicsDiffDriveError
 {
 public:
-  KinematicsError(const Eigen::Matrix2d &information)
+  KinematicsDiffDriveError(const Eigen::Matrix2d &information)
       : sqrt_information_(information.llt().matrixL()) {}
 
   template <typename T>
@@ -28,7 +28,7 @@ public:
     const Eigen::Matrix<T, 2, 1> conf2(*x2, *y2);
 
     const Eigen::Matrix<T, 2, 1> deltaS = conf2 - conf1;
-
+    std::cout<<"deltaS"<<":"<<deltaS(0)<<","<<deltaS(1)<<std::endl;
     Eigen::Map<Eigen::Matrix<T, 2, 1> > residuals_map(residuals_ptr);
     residuals_map(0) = ceres::abs((cos(T(*yaw1)) + cos(T(*yaw2))) * deltaS(1) -
                                     (sin(T(*yaw1)) + sin(T(*yaw2))) * deltaS(0));
@@ -38,7 +38,7 @@ public:
     residuals_map(1) = penaltyBoundFromBelow<T>(dir, (T)0, (T)0);
     residuals_map = sqrt_information_.template cast<T>() * residuals_map;
 
-    //std::cout<<residuals_map(0)<<","<<residuals_map(1)<<std::endl;
+    std::cout<<residuals_map(0)<<","<<residuals_map(1)<<std::endl;
 
     
 
@@ -47,7 +47,7 @@ public:
 
   static ceres::CostFunction *Create(const Eigen::Matrix2d &information)
   {
-    return (new ceres::AutoDiffCostFunction<KinematicsError, 2, 1, 1, 1, 1, 1, 1>(new KinematicsError(information)));
+    return (new ceres::AutoDiffCostFunction<KinematicsDiffDriveError, 2, 1, 1, 1, 1, 1, 1>(new KinematicsDiffDriveError(information)));
   }
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

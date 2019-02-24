@@ -11,7 +11,7 @@ import re
 import subprocess
 import yaml
 import sys
-
+win_size = 0.5
 def fprintf(stream, format_spec, *args):
     stream.write(format_spec % args)
 
@@ -19,8 +19,8 @@ class GUI(object):
     def __init__(self):
         self.idx = 0
         self.fig, self.ax = plt.subplots()
-        self.ax.set_xlim([-18,18])
-        self.ax.set_ylim([-10,10])
+        self.ax.set_xlim([-18*win_size,18*win_size])
+        self.ax.set_ylim([-10*win_size,10*win_size])
         self.cur_pose = [0,0]
 
         self.path = []
@@ -152,8 +152,8 @@ class GUI(object):
             
     def update(self):
         self.ax.cla()
-        self.ax.set_xlim([-18,18])
-        self.ax.set_ylim([-10,10])
+        self.ax.set_xlim([-18*win_size,18*win_size])
+        self.ax.set_ylim([-10*win_size,10*win_size])
 
         if len(self.path) != 0:
             path = np.array(self.path)

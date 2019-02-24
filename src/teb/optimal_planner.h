@@ -39,12 +39,10 @@
 namespace teb_demo
 {
 
-
-
 class OptimalPlanner
 {
 public:
-  OptimalPlanner(YAML::Node* config);
+  OptimalPlanner(YAML::Node *config);
   void addPose(double x, double y, double angle);
   void addObstacle(double x, double y);
   void solve();
@@ -56,12 +54,38 @@ private:
   void addTimeEdges(ceres::Problem &problem);
   void addVelocityEdges(ceres::Problem &problem);
   void addObstacleEdges(ceres::Problem &problem);
-  BaseRobotFootprintModel* createRobotFootprint();
+  BaseRobotFootprintModel *createRobotFootprint();
 
   std::vector<PoseSE2> poses_;
   std::vector<Obstacle *> obstacles_;
   std::vector<double> time_diffs_;
-  YAML::Node* config_;
+  YAML::Node *config_;
+
+  bool autosize_;
+  double dt_ref_;
+  double dt_hysteresis_;
+  double min_samples_;
+  double max_samples_;
+
+  double max_vel_x_;
+  double max_vel_x_backwards_;
+  double max_vel_theta_;
+  double acc_lim_x_;
+  double acc_lim_theta_;
+  double min_turning_radius_;
+
+  BaseRobotFootprintModel *robot_model_;
+
+  double min_obstacle_dist_;
+
+  double penalty_epsilon_;
+  double weight_max_vel_x_;
+  double weight_max_vel_theta_;
+  double weight_kinematics_nh_;
+  double weight_kinematics_forward_drive_;
+  double weight_kinematics_turning_radius_;
+  double weight_optimaltime_;
+  double weight_obstacle_;
 };
 
 } // namespace teb_demo

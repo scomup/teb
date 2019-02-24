@@ -1,5 +1,5 @@
  # Trajectory
- autosize: True
+ autosize: false
  dt_ref: 0.3
  dt_hysteresis: 0.1
  min_samples: 3
@@ -8,23 +8,27 @@
  # Robot
  max_vel_x: 0.35
  max_vel_x_backwards: 0.1
+ max_vel_theta: 0.1
  acc_lim_x: 0.5
  acc_lim_theta: 0.1
+ min_turning_radius: 1.6
 
  footprint_model:
   type: "polygon"
   vertices: [[0.65, 0.38], [-0.75, 0.38], [-0.75, -0.38], [0.65, -0.38]]
 
  # Obstacles
- min_obstacle_dist: 1 # This value must also include our robot radius, since footprint_model is set to "point".
+ min_obstacle_dist: 1.3 # This value must also include our robot radius, since footprint_model is set to "point".
 
  # Optimization
     
  penalty_epsilon: 0.1
- weight_max_vel_x: 200
- weight_max_vel_theta: 10
+ weight_max_vel_x: 0
+ weight_max_vel_theta: 0
  weight_kinematics_nh: 1000
- weight_kinematics_forward_drive: 10
- weight_optimaltime: 10
- weight_obstacle: 100
+ weight_kinematics_forward_drive: 0
+ weight_kinematics_turning_radius: 0
+ weight_optimaltime: 0
+ weight_obstacle: 10
+
  
