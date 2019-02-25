@@ -7,6 +7,7 @@
 #include "ceres/ceres.h"
 #include "src/teb/penalties.h"
 #include "Eigen/Core"
+#include "src/common/misc.h"
 
 namespace teb_demo
 {
@@ -28,17 +29,41 @@ public:
     const Eigen::Matrix<T, 2, 1> conf2(*x2, *y2);
 
     const Eigen::Matrix<T, 2, 1> deltaS = conf2 - conf1;
-    std::cout<<"deltaS"<<":"<<deltaS(0)<<","<<deltaS(1)<<std::endl;
     Eigen::Map<Eigen::Matrix<T, 2, 1> > residuals_map(residuals_ptr);
-    residuals_map(0) = ceres::abs((cos(T(*yaw1)) + cos(T(*yaw2))) * deltaS(1) -
-                                    (sin(T(*yaw1)) + sin(T(*yaw2))) * deltaS(0));
+
+    T theta0 = cos(T(*yaw1)) * deltaS(1) - sin(T(*yaw1)) * deltaS(0);
+    T theta1 = -cos(T(*yaw2)) * deltaS(1) + sin(T(*yaw2)) * deltaS(0);
+    residuals_map(0) = ceres::abs(normalize_theta<T>(normalize_theta<T>(theta0) - normalize_theta<T>(theta1)));
+    //residuals_map(0) = ceres::abs(normalize_theta<T>(theta0 - theta1));
+    /*
+    T e1 = ceres::abs(theta0 - theta1);
+    T e2 = ceres::abs(normalize_theta<T>(theta0) - normalize_theta<T>(theta1));
+    T e3 = ceres::abs(normalize_theta<T>(theta0-theta1));
+    T e4 = ceres::abs(normalize_theta<T>(normalize_theta<T>(theta0) - normalize_theta<T>(theta1)));
+    if (  ceres::abs(e4 - e1)> 0.000001 )
+    {
+      std::cout << "-------------------------\n";
+      std::cout << "A: x:" << *x1 << " y:" << *y1 << " :theta"
+                << ":" << *yaw1 << std::endl;
+      std::cout << "B: x:" << *x2 << " y:" << *y2 << " :theta"
+                << ":" << *yaw2 << std::endl;
+      std::cout << "theta0:" << theta0 << ","
+                << "theta1"
+                << ":" << theta1 << std::endl;
+      std::cout << "residuals_map(0):" << residuals_map(0) << std::endl;
+      std::cout << "e1:" << e1 << std::endl;
+      std::cout << "e2:" << e2 << std::endl;
+      std::cout << "e3:" << e3 << std::endl;
+      std::cout << "e4:" << e4 << std::endl;
+    }
+    */
 
     Eigen::Matrix<T, 2, 1> angle_vec(cos(T(*yaw1)), sin(T(*yaw1)));
     T dir = deltaS.dot(angle_vec);
     residuals_map(1) = penaltyBoundFromBelow<T>(dir, (T)0, (T)0);
     residuals_map = sqrt_information_.template cast<T>() * residuals_map;
 
-    std::cout<<residuals_map(0)<<","<<residuals_map(1)<<std::endl;
+    //std::cout<<residuals_map(0)<<","<<residuals_map(1)<<std::endl;
 
     
 

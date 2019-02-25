@@ -155,6 +155,18 @@ class GUI(object):
         self.ax.set_xlim([-18*win_size,18*win_size])
         self.ax.set_ylim([-10*win_size,10*win_size])
 
+        if len(self.path_new) != 0:
+            path = np.array(self.path_new)
+            self.ax.plot(path[:,0], path[:,1], c='r')
+            self.ax.scatter(path[:,0], path[:,1], c='r')
+
+        if len(self.obst) != 0:
+            obst = np.array(self.obst)
+            self.ax.scatter(obst[:,0], obst[:,1], c='b')
+            for o in obst:
+                self.ax.add_patch(plt.Circle((o[0], o[1]), self.min_dist, color='b', alpha=0.1))
+
+
         if len(self.path) != 0:
             path = np.array(self.path)
             self.ax.plot(path[:,0], path[:,1], c='g',linewidth=0.5)
@@ -169,19 +181,13 @@ class GUI(object):
                 polygon = polygon.transpose()
                 polygon = polygon + np.tile( np.array([p[0], p[1]]), (self.polygon.shape[0], 1))
                 self.ax.add_patch(plt.Polygon(polygon, color='g', alpha=0.1))
+                #plt.pause(0.1)
+                #self.ax.cla()
+                #self.ax.set_xlim([-18*win_size,18*win_size])
+                #self.ax.set_ylim([-10*win_size,10*win_size])
             vec = np.array(vec)
             self.ax.quiver(path[:,0], path[:,1], vec[:,0], vec[:,1], color='g',width=0.001, scale= 30)
 
-        if len(self.path_new) != 0:
-            path = np.array(self.path_new)
-            self.ax.plot(path[:,0], path[:,1], c='r')
-            self.ax.scatter(path[:,0], path[:,1], c='r')
-
-        if len(self.obst) != 0:
-            obst = np.array(self.obst)
-            self.ax.scatter(obst[:,0], obst[:,1], c='b')
-            for o in obst:
-                self.ax.add_patch(plt.Circle((o[0], o[1]), self.min_dist, color='b', alpha=0.1))
 
         plt.draw()
 

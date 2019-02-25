@@ -112,10 +112,10 @@ bool OptimalPlanner::calcTimeDiff()
   if (timestep < 0)
     timestep = 0.2; // TODO: this is an assumption
 
-  double yaw = atan2(diff_last[1], diff_last[0]);
-  //if (backwards)
-  //  yaw = normalize_theta<double>(yaw + M_PI);
-  prev.theta() = yaw;
+
+  //todo: liu
+  //double yaw = atan2(diff_last[1], diff_last[0]);
+  //prev.theta() = yaw;
   time_diffs_.push_back(timestep);
   return true;
 }
@@ -286,7 +286,7 @@ void OptimalPlanner::addObstacleEdges(ceres::Problem &problem)
       auto &current = poses_[j];
       double dist = obstacles_[i]->getMinimumDistance(current.position());
 
-      if (dist > 2.5 * min_obstacle_dist_)
+      if (dist > 4)
         continue;
 
       problem.AddResidualBlock(cost_function, NULL,
@@ -317,7 +317,8 @@ void OptimalPlanner::solve()
   std::vector<double> residuals;
   problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
   std::cout << "Initial total cost:" << total_cost << "\n";
-/*
+  #if 1
+
   ceres::Solver::Options options;
   options.max_num_iterations = 100;
   options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
@@ -345,7 +346,8 @@ void OptimalPlanner::solve()
     sprintf(src, "OBST: %5.2lf %5.2lf\r\n", pose.x(), pose.y());
     myfile << src;
   }
-  myfile.close();*/
+  myfile.close();
+  #endif
 }
 
 } // namespace teb_demo

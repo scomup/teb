@@ -33,8 +33,31 @@ public:
     const Eigen::Matrix<T, 2, 1> deltaS = conf2 - conf1;
 
     Eigen::Map<Eigen::Matrix<T, 2, 1>> residuals_map(residuals_ptr);
-    residuals_map(0) = ceres::abs((cos(T(*yaw1)) + cos(T(*yaw2))) * deltaS(1) -
-                                  (sin(T(*yaw1)) + sin(T(*yaw2))) * deltaS(0));
+
+    T theta0 = cos(T(*yaw1)) * deltaS(1) - sin(T(*yaw1)) * deltaS(0);
+    T theta1 = -cos(T(*yaw2)) * deltaS(1) + sin(T(*yaw2)) * deltaS(0);
+    residuals_map(0) = ceres::abs(normalize_theta<T>(normalize_theta<T>(theta0) - normalize_theta<T>(theta1)));
+
+    /*
+    T e1 = ceres::abs(theta0 - theta1);
+    T e2 = ceres::abs(normalize_theta<T>(theta0) - normalize_theta<T>(theta1));
+    T e3 = ceres::abs(normalize_theta<T>(theta0 - theta1));
+    T e4 = ceres::abs(normalize_theta<T>(normalize_theta<T>(theta0) - normalize_theta<T>(theta1)));
+
+    std::cout << "-------------------------\n";
+    std::cout << "A: x:" << *x1 << " y:" << *y1 << " :theta"
+              << ":" << *yaw1 << std::endl;
+    std::cout << "B: x:" << *x2 << " y:" << *y2 << " :theta"
+              << ":" << *yaw2 << std::endl;
+    std::cout << "theta0:" << theta0 << ","
+              << "theta1"
+              << ":" << theta1 << std::endl;
+    std::cout << "residuals_map(0):" << residuals_map(0) << std::endl;
+    std::cout << "e1:" << e1 << std::endl;
+    std::cout << "e2:" << e2 << std::endl;
+    std::cout << "e3:" << e3 << std::endl;
+    std::cout << "e4:" << e4 << std::endl;
+    */
 
     T angle_diff = normalize_theta<T>(*yaw2 - *yaw1);
     if (ceres::abs(angle_diff) < (T)0.0001)
@@ -43,8 +66,8 @@ public:
       residuals_map(1) = penaltyBoundFromBelow<T>(ceres::abs(deltaS.norm() / ((T)2 * sin(angle_diff / (T)2))), (T)min_turning_radius_, (T)0.0);
 
     residuals_map = sqrt_information_.template cast<T>() * residuals_map;
-
     //std::cout<<residuals_map(0)<<","<<residuals_map(1)<<std::endl;
+    //std::cout<<ceres::abs(deltaS.norm() / ((T)2 * sin(angle_diff / (T)2)))<<","<<residuals_map(1)<<std::endl;
 
     return true;
   }
