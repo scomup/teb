@@ -10,9 +10,6 @@
 
 #include "yaml-cpp/yaml.h"
 
-#include <QApplication>
-#include "src/qtviewer/window.h"
-
 
 using namespace teb_demo;
 int main(int argc, char **argv)
