@@ -55,7 +55,7 @@ class GUI(object):
 
     def load_config(self):
         config_file = open("/home/liu/workspace/teb/config/sample.yaml", "r")
-        config = yaml.load(config_file)
+        config = yaml.load(config_file,Loader=yaml.Loader)
         self.min_dist = config["min_obstacle_dist"]  
         self.model_name = config["footprint_model"]["type"]
         self.polygon = np.matrix(config["footprint_model"]["vertices"])
