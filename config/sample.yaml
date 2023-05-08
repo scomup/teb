@@ -25,10 +25,14 @@
  penalty_epsilon: 0.1
  weight_max_vel_x: 200
  weight_max_vel_theta: 10
- weight_kinematics_nh: 100
  weight_kinematics_forward_drive: 1
  weight_kinematics_turning_radius: 0
- weight_optimaltime: 10
- weight_obstacle: 100
+
+ obstacle_noise: 0.1
+ time_noise: 1
+ velocity_noise: 1
+ kinematic_noise: 1
+
+
 
  

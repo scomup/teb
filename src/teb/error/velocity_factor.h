@@ -28,12 +28,13 @@ namespace teb_demo
         const double max_vel_x_backwards,
         const double max_vel_x,
         const double max_vel_theta,
+        const double epsilon,
         const gtsam::SharedNoiseModel &noiseModel)
         : Base(noiseModel, xi_key, xj_key, xk_key),
           max_vel_x_backwards_(max_vel_x_backwards),
           max_vel_x_(max_vel_x),
           max_vel_theta_(max_vel_theta),
-          penalty_epsilon_(0)
+          penalty_epsilon_(epsilon)
 
     {
     }

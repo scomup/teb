@@ -1,19 +1,11 @@
 #include <cmath>
+#include "src/teb/error/kinematics_diff_drvie_factor.h"
 #include "src/teb/error/kinematics_car_like_factor.h"
 #include "src/teb/error/obstacle_factor.h"
 #include "src/teb/error/time_factor.h"
 #include "src/teb/error/velocity_factor.h"
-
-#include "src/teb/error/kinematics_diff_drvie_error.h"
-#include "src/teb/error/kinematics_car_like_error.h"
-#include "src/teb/error/obstacle_error.h"
-#include "src/teb/error/velocity_error.h"
-#include "src/teb/error/time_error.h"
-
-
-
-
 #include "src/teb/obstacles.h"
+
 #include <iostream>
 #include <fstream>
 
@@ -47,11 +39,19 @@ namespace teb_demo
     penalty_epsilon_ = (*config_)["penalty_epsilon"].as<double>();
     weight_max_vel_x_ = (*config_)["weight_max_vel_x"].as<double>();
     weight_max_vel_theta_ = (*config_)["weight_max_vel_theta"].as<double>();
-    weight_kinematics_nh_ = (*config_)["weight_kinematics_nh"].as<double>();
     weight_kinematics_forward_drive_ = (*config_)["weight_kinematics_forward_drive"].as<double>();
     weight_kinematics_turning_radius_ = (*config_)["weight_kinematics_turning_radius"].as<double>();
-    weight_optimaltime_ = (*config_)["weight_optimaltime"].as<double>();
-    weight_obstacle_ = (*config_)["weight_obstacle"].as<double>();
+    double obstacle_noise = (*config_)["obstacle_noise"].as<double>();
+    double time_noise = (*config_)["time_noise"].as<double>();
+    double velocity_noise = (*config_)["velocity_noise"].as<double>();
+    double kinematic_noise = (*config_)["kinematic_noise"].as<double>();
+
+    obstacle_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(1) << obstacle_noise).finished());
+    time_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(1) << time_noise).finished());
+    velocity_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(2) << velocity_noise, velocity_noise).finished());
+    kinematic_noise1_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(1) << kinematic_noise).finished());
+    kinematic_noise2_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(2) << kinematic_noise, kinematic_noise).finished());
+    fix_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(3) << 1e-6, 1e-6, 1e-6).finished());
 }
 
 void OptimalPlanner::autoResize(double dt_ref, double dt_hysteresis, int min_samples, int max_samples, bool fast_mode)
@@ -136,8 +136,6 @@ bool OptimalPlanner::calcTimeDiff()
 void OptimalPlanner::addPose(double x, double y, double angle)
 {
   poses_.emplace_back(x, y, angle);
-  //values_.insert( P(poses_.size()-1), gtsam::Pose2(x, y, angle));
-  //printf("insert P %d\n", poses_.size()-1);
   calcTimeDiff();
 }
 
@@ -148,11 +146,6 @@ void OptimalPlanner::addObstacle(double x, double y)
 
 void OptimalPlanner::addKinematicEdges()
 {  
-
-  //gtsam::noiseModel::Gaussian::shared_ptr model = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(3) << 1, 1, 1).finished());
-  gtsam::noiseModel::Gaussian::shared_ptr model = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(2) << 1, 1).finished());
-
-
   //add kinematics edges
   for (size_t i = 0; i < poses_.size() - 1; i++)
   {
@@ -160,61 +153,57 @@ void OptimalPlanner::addKinematicEdges()
     if (min_turning_radius_ == 0 || weight_kinematics_turning_radius_ == 0)
     {
       //TODO: use diff model
-      graph_.emplace_shared<KinematicsCarLikeFactor>(P(i), P(i + 1), min_turning_radius_, model);
+      graph_.emplace_shared<KinematicsDiffDriveFactor>(P(i), P(i + 1), min_turning_radius_, kinematic_noise1_);
+      factor_type_.push_back("KinematicsDiffDriveFactor");
     }
     else
     {
-      graph_.emplace_shared<KinematicsCarLikeFactor>(P(i), P(i + 1), min_turning_radius_, model);
+      graph_.emplace_shared<KinematicsCarLikeFactor>(P(i), P(i + 1), min_turning_radius_, kinematic_noise1_);
+      factor_type_.push_back("KinematicsCarLikeFactor");
     }
   }
   int start_id = 0;
   int goal_id = poses_.size() - 1;
-  gtsam::noiseModel::Gaussian::shared_ptr fix_noise = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(3) << 1e-6, 1e-6, 1e-6).finished());
-  graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(start_id), gtsam::Pose2(poses_[start_id].x(),poses_[start_id].y(),poses_[start_id].theta()), fix_noise));
-  graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(goal_id), gtsam::Pose2(poses_[goal_id].x(),poses_[goal_id].y(),poses_[goal_id].theta()), fix_noise));
+  graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(start_id), gtsam::Pose2(poses_[start_id].x(),poses_[start_id].y(),poses_[start_id].theta()), fix_noise_));
+  graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(goal_id), gtsam::Pose2(poses_[goal_id].x(),poses_[goal_id].y(),poses_[goal_id].theta()), fix_noise_));
 
 }
 
 void OptimalPlanner::addObstacleEdges()
 {
 
-  gtsam::noiseModel::Gaussian::shared_ptr model = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(2) << 1, 1).finished());
-
-
   for (size_t i = 0; i < obstacles_.size(); i++)
   {
     for (size_t j = 0; j < poses_.size(); j++)
     {
-      auto &current = poses_[j];
-      double dist = obstacles_[i]->getMinimumDistance(current.position());
+      double dist = obstacles_[i]->getMinimumDistance(poses_[j].position());
 
       if (dist > 4)
         continue;
 
-      graph_.emplace_shared<ObstacleFactor>(P(i),
+      graph_.emplace_shared<ObstacleFactor>(P(j),
                                             robot_model_,
                                             obstacles_[i],
                                             min_obstacle_dist_,
-                                            model);
+                                            penalty_epsilon_,
+                                            obstacle_noise_);
+      factor_type_.push_back("ObstacleFactor");
     }
   }
 }
 
 void OptimalPlanner::addTimeEdges()
 {
-  gtsam::noiseModel::Gaussian::shared_ptr model = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(1) << 1).finished());
   for (size_t i = 0; i < time_diffs_.size(); i++)
   {
 
-    graph_.emplace_shared<TimeFactor>(T(i), model);
+    graph_.emplace_shared<TimeFactor>(T(i), time_noise_);
+    factor_type_.push_back("TimeFactor");
   }
 }
 
 void OptimalPlanner::addVelocityEdges()
 {
-
-  gtsam::noiseModel::Gaussian::shared_ptr model = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(2) << 1, 1).finished());
-
 
   for (size_t i = 0; i < poses_.size() - 1; i++)
   {
@@ -222,7 +211,9 @@ void OptimalPlanner::addVelocityEdges()
                                           max_vel_x_backwards_,
                                           max_vel_x_,
                                           max_vel_theta_,
-                                          model);
+                                          penalty_epsilon_,
+                                          velocity_noise_);
+    factor_type_.push_back("VelocityFactor");
   }
 }
 
@@ -280,12 +271,12 @@ void OptimalPlanner::solve()
     autoResize(dt_ref_, dt_hysteresis_, min_samples_, max_samples_, false);
   }
 
-  for(int i = 0; i < poses_.size(); i++)
+  for(uint32_t i = 0; i < poses_.size(); i++)
   {
     values_.insert( P(i), gtsam::Pose2(poses_[i].x(), poses_[i].y(), poses_[i].theta()));
   }
 
-  for(int i = 0; i < time_diffs_.size(); i++)
+  for(uint32_t i = 0; i < time_diffs_.size(); i++)
   {
     values_.insert( T(i), gtsam::Vector1(time_diffs_[i]));
   }
@@ -300,21 +291,21 @@ void OptimalPlanner::solve()
   parameters.maxIterations = 100;
 
   gtsam::LevenbergMarquardtOptimizer optimizer(graph_, values_, parameters);
-  gtsam::Values result = optimizer.optimize();
+  result_ = optimizer.optimize();
 
-  for (int i = 0; i < poses_.size(); ++i)
+
+  for (uint32_t i = 0; i < poses_.size(); ++i)
   {
-    gtsam::Pose2 pose = result.at<gtsam::Pose2>(P(i));
+    gtsam::Pose2 pose = result_.at<gtsam::Pose2>(P(i));
     poses_[i] = PoseSE2(pose.x(), pose.y(), pose.theta());
   }
 
-  for (int i = 0; i < time_diffs_.size(); ++i)
+  for (uint32_t i = 0; i < time_diffs_.size(); ++i)
   {
-    gtsam::Vector1 dt = result.at<gtsam::Vector1>(T(i));
+    gtsam::Vector1 dt = result_.at<gtsam::Vector1>(T(i));
     time_diffs_[i] = dt(0);
   }
-
-
+  
   std::ofstream myfile;
   char src[200];
 
@@ -333,8 +324,38 @@ void OptimalPlanner::solve()
     myfile << src;
   }
   myfile.close();
+}
 
-
+void OptimalPlanner::report()
+{
+  double error0 = 0;
+  double error1 = 0;
+  std::map<std::string, std::vector<double>> type_score;
+  for (uint i = 0; i < graph_.size(); i++)
+  {
+    auto &factor = graph_.at(i);
+    double err0 = factor->error(values_);
+    double err1 = factor->error(result_);
+    if (type_score.count(factor_type_[i]) == 0)
+    {
+      type_score[factor_type_[i]] = {err0, err1};
+    }
+    else
+    {
+      type_score[factor_type_[i]][0] += err0;
+      type_score[factor_type_[i]][1] += err1;
+    }
+    error0 += err0;
+    error1 += err1;
+  }
+  printf("=========================\n");
+  printf("Overall error: %f --> %f.\n", error0, error1);
+  for (auto m : type_score)
+  {
+    auto name = m.first;
+    auto score = m.second;
+    printf("  --> Factor %s : %f --> %f.\n", name.c_str(), score[0], score[1]);
+  }
 }
 
 } // namespace teb_demo

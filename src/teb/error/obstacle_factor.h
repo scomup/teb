@@ -29,12 +29,13 @@ namespace teb_demo
         const BaseRobotFootprintModel *robot_model,
         const Obstacle *obstacle,
         const double min_dist,
+        const double epsilon,
         const gtsam::SharedNoiseModel &noiseModel)
         : Base(noiseModel, xi_key),
           robot_model_(robot_model),
           obstacle_(obstacle),
           min_dist_(min_dist),
-          epsilon_(0)
+          epsilon_(epsilon)
     {
     }
 

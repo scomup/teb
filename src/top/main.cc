@@ -25,5 +25,5 @@ int main(int argc, char **argv)
         teb.addObstacle(o[0], o[1]);
     }
     teb.solve();
-    printf("We get a new path!\n");
+    teb.report();
 }
