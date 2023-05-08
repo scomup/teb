@@ -123,13 +123,7 @@ bool OptimalPlanner::calcTimeDiff()
   if (timestep < 0)
     timestep = 0.2; // TODO: this is an assumption
 
-
-  //todo: liu
-  //double yaw = atan2(diff_last[1], diff_last[0]);
-  //prev.theta() = yaw;
   time_diffs_.push_back(timestep);
-  //values_.insert( T(time_diffs_.size()-1), gtsam::Vector1(timestep));
-  //printf("insert T %d\n", time_diffs_.size()-1);
 
   return true;
 }
@@ -183,7 +177,9 @@ void OptimalPlanner::addKinematicEdges()
   int start_id = 0;
   int goal_id = poses_.size() - 1;
   graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(start_id), gtsam::Pose2(poses_[start_id].x(),poses_[start_id].y(),poses_[start_id].theta()), fix_noise_));
+  factor_type_.push_back("PriorFactor");
   graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(goal_id), gtsam::Pose2(poses_[goal_id].x(),poses_[goal_id].y(),poses_[goal_id].theta()), fix_noise_));
+  factor_type_.push_back("PriorFactor");
 
 }
 
@@ -194,9 +190,9 @@ void OptimalPlanner::addObstacleEdges()
   {
     for (size_t j = 0; j < poses_.size(); j++)
     {
-      double dist = obstacles_[i]->getMinimumDistance(poses_[j].position());
+      double dist = robot_model_->calculateDistance(poses_[j], obstacles_[i]);
 
-      if (dist > 4)
+      if (dist > min_obstacle_dist_ * 3)
         continue;
 
       graph_.emplace_shared<ObstacleFactor>(P(j),
@@ -215,7 +211,7 @@ void OptimalPlanner::addTimeEdges()
   for (size_t i = 0; i < time_diffs_.size(); i++)
   {
 
-    graph_.emplace_shared<TimeFactor>(T(i), time_noise_);
+    graph_.emplace_shared<TimeFactor>(T(i), time_diffs_[i], time_noise_);
     factor_type_.push_back("TimeFactor");
   }
 }
@@ -326,7 +322,7 @@ void OptimalPlanner::solve()
 
   std::ofstream myfile;
 
-  myfile.open("/home/liu/workspace/teb/script/new_path.txt");
+  myfile.open("script/new_path.txt");
 
   for (auto &current : poses_)
   {
@@ -381,6 +377,24 @@ void OptimalPlanner::report()
     auto score = m.second;
     printf("  --> Factor %s : %f --> %f.\n", name.c_str(), score[0], score[1]);
   }
+
+  double closest_dist = INFINITY;
+  double avg_dist = 0;
+  for (size_t i = 0; i < obstacles_.size(); i++)
+  {
+    for (size_t j = 0; j < poses_.size(); j++)
+    {
+      double dist = robot_model_->calculateDistance(poses_[j], obstacles_[i]);
+      if(closest_dist > dist)
+        closest_dist = dist;
+      avg_dist += dist;
+      
+      //printf("the distance form obstacle %d to pose %d is %f\n", i, j, dist);
+    }
+  }
+  
+  printf("The closest distance is %f\n", closest_dist);
+  printf("The closest distance is %f\n", closest_dist);
 }
 
 } // namespace teb_demo

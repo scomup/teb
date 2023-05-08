@@ -13,8 +13,8 @@
 using namespace teb_demo;
 int main(int argc, char **argv)
 {
-    LogFile f("/home/liu/workspace/teb/script/path.txt");
-    YAML::Node config = YAML::LoadFile("/home/liu/workspace/teb/config/sample.yaml");
+    LogFile f("../script/path.txt");
+    YAML::Node config = YAML::LoadFile("../config/sample.yaml");
     OptimalPlanner teb(&config);
     for (auto &pose : f.paths())
     {

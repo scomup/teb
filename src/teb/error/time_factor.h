@@ -13,21 +13,29 @@ namespace teb_demo
   {
   protected:
     typedef gtsam::NoiseModelFactor1<gtsam::Vector1> Base;
+    double dt_;
 
   public:
     virtual ~TimeFactor() {}
 
     TimeFactor(
         const gtsam::Key &xi_key,
+        const double dt,
         const gtsam::SharedNoiseModel &noiseModel)
-        : Base(noiseModel, xi_key)
+        : Base(noiseModel, xi_key),
+        dt_(dt)
     {
     }
 
 
     Eigen::Matrix<double,1,1> error(const gtsam::Vector1 &x) const
     {
-      Eigen::Matrix<double,1,1> res = x;
+      Eigen::Matrix<double,1,1> res;
+      double e = x(0) - dt_;
+      if(e < 0)
+        res(0) = 0;
+      else
+        res(0) = e;
       return res;
     }
 

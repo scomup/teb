@@ -45,7 +45,8 @@ namespace teb_demo
       Eigen::Matrix<double,1,1> res;
       PoseSE2 pose(x.x(), x.y(), x.theta());
       double dist = robot_model_->calculateDistance(pose, obstacle_);
-      res(0) = penaltyBoundFromBelow<double>(dist, min_dist_, epsilon_);
+      double c = penaltyBoundFromBelow<double>(dist, min_dist_, epsilon_);
+      res(0) = c*c;
       return res;
     }
 

@@ -226,6 +226,38 @@ inline double distance_segment_to_polygon_2d(const Eigen::Vector2d& line_start, 
   
   return dist;
 }
+inline bool pointIsInPolygon(const Point2dContainer &polygon, const Eigen::Vector2d &point)
+{
+  int cross = 0;
+  for (unsigned int i = 0, j = polygon.size() - 1; i < polygon.size(); j = i++)
+  {
+    if (((polygon[i].y() > point.y()) != (polygon[j].y() > point.y())) &&
+        (point.x() < (polygon[j].x() - polygon[i].x()) * (point.y() - polygon[i].y()) /
+                             (polygon[j].y() - polygon[i].y()) +
+                         polygon[i].x()))
+    {
+      cross++;
+    }
+  }
+  return bool(cross % 2);
+}
+
+
+inline bool polygonIsInPolygon(const Point2dContainer &polygonA, const Point2dContainer &polygonB)
+{
+  for (auto a : polygonA)
+  {
+    if (pointIsInPolygon(polygonB, a))
+      return true;
+  }
+  for (auto b : polygonB)
+  {
+    if (pointIsInPolygon(polygonA, b))
+      return true;
+  }
+  return false;
+}
+
 
 /**
  * @brief Helper function to calculate the smallest distance between two closed polygons
@@ -237,6 +269,9 @@ inline double distance_polygon_to_polygon_2d(const Point2dContainer& vertices1, 
 {
   double dist = HUGE_VAL;
     
+  if(polygonIsInPolygon(vertices1, vertices2))
+    return 0;
+
   // the polygon1 is a point
   if (vertices1.size() == 1)
   {

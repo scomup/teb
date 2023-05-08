@@ -18,7 +18,7 @@
   vertices: [[0.65, 0.38], [-0.75, 0.38], [-0.75, -0.38], [0.65, -0.38]]
 
  # Obstacles
- min_obstacle_dist: 0.5 # This value must also include our robot radius, since footprint_model is set to "point".
+ min_obstacle_dist: 1 # This value must also include our robot radius, since footprint_model is set to "point".
 
  # Optimization
     
@@ -29,9 +29,9 @@
  weight_kinematics_turning_radius: 0
 
  obstacle_noise: 0.1
- time_noise: 1
- velocity_noise: 1
- kinematic_noise: 1
+ time_noise: 0.1
+ velocity_noise: 0.01
+ kinematic_noise: 0.001
 
 
 
