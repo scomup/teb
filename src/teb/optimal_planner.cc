@@ -322,7 +322,7 @@ void OptimalPlanner::solve()
 
   std::ofstream myfile;
 
-  myfile.open("script/new_path.txt");
+  myfile.open("../script/new_path.txt");
 
   for (auto &current : poses_)
   {
@@ -393,7 +393,6 @@ void OptimalPlanner::report()
     }
   }
   
-  printf("The closest distance is %f\n", closest_dist);
   printf("The closest distance is %f\n", closest_dist);
 }
 

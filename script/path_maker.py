@@ -59,7 +59,7 @@ class GUI(object):
         plt.show()
 
     def load_config(self):
-        config_file = open("/home/liu/workspace/teb/config/sample.yaml", "r")
+        config_file = open("../config/sample.yaml", "r")
         config = yaml.load(config_file,Loader=yaml.Loader)
         self.min_dist = config["min_obstacle_dist"]  
         self.model_name = config["footprint_model"]["type"]
@@ -75,8 +75,8 @@ class GUI(object):
     def on_run(self, event):
         #self.save("path.txt")
         self.save("path.txt")
-        subprocess.call(["/home/liu/workspace/teb/build/teb_demo"])
-        self.load("new_path.txt")
+        subprocess.call(["../build/teb_demo"])
+        self.load("../script/new_path.txt")
         self.update()
 
     def on_click(self, event):
