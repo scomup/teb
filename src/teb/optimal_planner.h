@@ -36,12 +36,26 @@
 #include "src/teb/robot_footprint_model.h"
 #include "yaml-cpp/yaml.h"
 
+#include <gtsam/inference/Symbol.h>
+#include <gtsam/nonlinear/ISAM2.h>
+#include <gtsam/nonlinear/NonlinearOptimizer.h>
+#include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+#include <gtsam/nonlinear/GaussNewtonOptimizer.h>
+#include <gtsam/nonlinear/NonlinearEquality.h>
+#include <gtsam/nonlinear/Marginals.h>
+#include <gtsam/slam/BetweenFactor.h>
+#include <gtsam/geometry/Pose2.h>
+
+
 namespace teb_demo
 {
 
 class OptimalPlanner
 {
+
 public:
+
+
   OptimalPlanner(YAML::Node *config);
   void addPose(double x, double y, double angle);
   void addObstacle(double x, double y);
@@ -50,10 +64,10 @@ public:
 private:
   void autoResize(double dt_ref, double dt_hysteresis, int min_samples, int max_samples, bool fast_mode);
   bool calcTimeDiff();
-  void addKinematicEdges(ceres::Problem &problem);
-  void addTimeEdges(ceres::Problem &problem);
-  void addVelocityEdges(ceres::Problem &problem);
-  void addObstacleEdges(ceres::Problem &problem);
+  void addKinematicEdges();
+  void addTimeEdges();
+  void addVelocityEdges();
+  void addObstacleEdges();
   BaseRobotFootprintModel *createRobotFootprint();
 
   std::vector<PoseSE2> poses_;
@@ -86,6 +100,14 @@ private:
   double weight_kinematics_turning_radius_;
   double weight_optimaltime_;
   double weight_obstacle_;
+
+  gtsam::NonlinearFactorGraph graph_;
+
+  gtsam::Values values_;
+
+  bool is_first = true;
+
+
 };
 
 } // namespace teb_demo

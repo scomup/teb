@@ -7,7 +7,6 @@
 #include "src/top/log_io.h"
 #include "src/teb/obstacles.h"
 #include "src/teb/robot_footprint_model.h"
-
 #include "yaml-cpp/yaml.h"
 
 
