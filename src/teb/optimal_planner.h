@@ -57,8 +57,8 @@ public:
 
 
   OptimalPlanner(YAML::Node *config);
-  void addPose(double x, double y, double angle);
-  void addObstacle(double x, double y);
+  void addPose(const Eigen::Vector3d& pose);
+  void addObstacle(const Point2dContainer& obst);
   void solve();
   void report();
 

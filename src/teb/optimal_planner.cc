@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <boost/format.hpp>
 
 #include "src/teb/optimal_planner.h"
 
@@ -133,15 +134,32 @@ bool OptimalPlanner::calcTimeDiff()
   return true;
 }
 
-void OptimalPlanner::addPose(double x, double y, double angle)
+void OptimalPlanner::addPose(const Eigen::Vector3d& pose)
 {
-  poses_.emplace_back(x, y, angle);
+  poses_.emplace_back(pose(0), pose(1), pose(2));
   calcTimeDiff();
 }
 
-void OptimalPlanner::addObstacle(double x, double y)
+void OptimalPlanner::addObstacle(const Point2dContainer& obst)
 {
-  obstacles_.push_back(new PointObstacle(x, y));
+  if(obst.size() == 0)
+  {
+  return;
+  }
+  else if(obst.size() == 1)
+  {
+    obstacles_.push_back(new PointObstacle(obst[0]));
+  }
+  else if(obst.size() == 2)
+  {
+    obstacles_.push_back(new LineObstacle(obst[0], obst[1]));
+  }
+  else if(obst.size() >= 3)
+  {
+    obstacles_.push_back(new PolygonObstacle(obst));
+  }
+
+
 }
 
 void OptimalPlanner::addKinematicEdges()
@@ -305,23 +323,30 @@ void OptimalPlanner::solve()
     gtsam::Vector1 dt = result_.at<gtsam::Vector1>(T(i));
     time_diffs_[i] = dt(0);
   }
-  
+
   std::ofstream myfile;
-  char src[200];
 
   myfile.open("/home/liu/workspace/teb/script/new_path.txt");
+
   for (auto &current : poses_)
   {
-    sprintf(src, "PATH: %5.2lf %5.2lf %5.2lf\r\n", current.x(), current.y(), normalize_theta(current.theta()));
-    myfile << src;
+    const std::string str = (boost::format("PATH: %5.2f %5.2f %5.2f\n") % current.x() % current.y() % current.theta()).str();
+    myfile << str;
   }
 
   for (auto &current : obstacles_)
   {
-    auto &pose = current->getCentroid();
+    geometry_msgs::Polygon polygon;
+    current->toPolygonMsg(polygon);
 
-    sprintf(src, "OBST: %5.2lf %5.2lf\r\n", pose.x(), pose.y());
-    myfile << src;
+    std::string str = std::string("OBST: ");
+
+    for(auto point : polygon.points)
+    {
+      str += (boost::format("%5.2f %5.2f ") % point.x % point.y).str();
+    }
+    str += std::string("\n");
+    myfile << str;
   }
   myfile.close();
 }
