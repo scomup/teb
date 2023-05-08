@@ -34,16 +34,14 @@ namespace teb_demo
       gtsam::Vector2 deltaS = pose2.translation() - pose1.translation();
       double yaw1 = pose1.rotation().theta();
       double yaw2 = pose2.rotation().theta();
-
       double theta0 = cos(yaw1) * deltaS(1) - sin(yaw1) * deltaS(0);
       double theta1 = -cos(yaw2) * deltaS(1) + sin(yaw2) * deltaS(0);
       res(0) = std::abs(normalize_theta<double>(normalize_theta<double>(theta0) - normalize_theta<double>(theta1)));
-      
       double angle_diff = normalize_theta<double>(yaw2 - yaw1);
       if (std::abs(angle_diff) < 0.0001)
         res(1) = 0; // straight line motion
       else
-        res(1) = penaltyBoundFromBelow<double>(ceres::abs(deltaS.norm() / (2 * sin(angle_diff / 2))), min_turning_radius_, 0.0);
+        res(1) = penaltyBoundFromBelow<double>(std::abs(deltaS.norm() / (2 * sin(angle_diff / 2))), min_turning_radius_, 0.0);
         
        return res;
     }
