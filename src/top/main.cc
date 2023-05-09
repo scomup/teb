@@ -13,10 +13,15 @@
 using namespace teb_demo;
 int main(int argc, char **argv)
 {
+    if(argc != 3)
+    {
+        printf("the first argument is the path of path file\n");
+        printf("the second argument is the path of yaml file\n");
+        return 0;
+    }
     printf("=========================\n");
-
-    LogFile f("../script/path.txt");
-    YAML::Node config = YAML::LoadFile("../config/sample.yaml");
+    LogFile f(argv[1]);
+    YAML::Node config = YAML::LoadFile(argv[2]);
     OptimalPlanner teb(&config);
     for (auto &pose : f.paths())
     {
@@ -30,4 +35,5 @@ int main(int argc, char **argv)
     teb.solve();
     teb.report();
     teb.getCloestDist();
+    return 0;
 }

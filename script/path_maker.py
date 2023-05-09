@@ -72,8 +72,8 @@ class GUI(object):
 
     def on_run(self, event):
         #self.save("path.txt")
-        subprocess.call(["../build/teb_demo"])
-        self.load("../script/new_path.txt")
+        subprocess.call(["../build/teb_demo", "path.txt", "../config/sample.yaml"])
+        self.load("new_path.txt")
         self.update()
 
     def on_click(self, event):

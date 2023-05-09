@@ -1,33 +1,33 @@
- # Trajectory
- autosize: true
- dt_ref: 0.5
- dt_hysteresis: 0.1
- min_samples: 3
- max_samples: 500
+# Trajectory
+autosize: true
+dt_ref: 0.5
+dt_hysteresis: 0.1
+min_samples: 3
+max_samples: 500
 
  # Robot
- max_vel_x: 1
- max_vel_x_backwards: 0.2
- max_vel_theta: 0.5
- acc_lim_x: 0.5
- acc_lim_theta: 0.2
- min_turning_radius: 1.5
+max_vel_x: 1
+max_vel_x_backwards: 0.2
+max_vel_theta: 0.5
+acc_lim_x: 0.5
+acc_lim_theta: 0.2
+min_turning_radius: 1.5
 
- footprint_model:
+footprint_model:
   type: "polygon"
   vertices: [[0.95, 0.38], [-0.25, 0.38], [-0.25, -0.38], [0.95, -0.38]]
 
- # Obstacles
- min_obstacle_dist: 0.9 # This value must also include our robot radius, since footprint_model is set to "point".
+# Obstacles
+min_obstacle_dist: 0.5 # This value must also include our robot radius, since footprint_model is set to "point".
 
- # Optimization
- penalty_epsilon: 0.1
- obstacle_noise: 0.001
- time_noise: 1
- velocity_x_noise: 0.1
- velocity_theta_noise: 0.1
- kinematic_forward_noise: 0.001
- kinematic_turning_noise: 0.001
+# Optimization
+penalty_epsilon: 0.1
+obstacle_noise: 0.001
+time_noise: 1
+velocity_x_noise: 0.1
+velocity_theta_noise: 0.1
+kinematic_forward_noise: 0.01
+kinematic_turning_noise: 0.01
 
 
 

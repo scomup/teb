@@ -18,7 +18,8 @@
             "request": "launch",
             "program": "/home/liu/workspace/teb/build/teb_demo",
             "args": [
-                ""
+                "/home/liu/workspace/teb/script/path.txt",
+                "/home/liu/workspace/teb/config/sample.yaml",
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
