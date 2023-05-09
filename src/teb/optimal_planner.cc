@@ -1,47 +1,56 @@
 #include <cmath>
-#include "ceres/ceres.h"
-#include "src/teb/error/kinematics_diff_drvie_error.h"
-#include "src/teb/error/kinematics_car_like_error.h"
-#include "src/teb/error/obstacle_error.h"
-#include "src/teb/error/velocity_error.h"
-#include "src/teb/error/time_error.h"
-
+#include "src/teb/error/kinematics_diff_drvie_factor.h"
+#include "src/teb/error/kinematics_car_like_factor.h"
+#include "src/teb/error/obstacle_factor.h"
+#include "src/teb/error/time_factor.h"
+#include "src/teb/error/velocity_factor.h"
 #include "src/teb/obstacles.h"
+
 #include <iostream>
 #include <fstream>
+#include <boost/format.hpp>
 
 #include "src/teb/optimal_planner.h"
 
 namespace teb_demo
 {
 
-OptimalPlanner::OptimalPlanner(YAML::Node *config)
-    : config_(config)
-{
-  autosize_ = (*config_)["autosize"].as<bool>();
-  dt_ref_ = (*config_)["dt_ref"].as<double>();
-  dt_hysteresis_ = (*config_)["dt_hysteresis"].as<double>();
-  min_samples_ = (*config_)["min_samples"].as<int>();
-  max_samples_ = (*config_)["max_samples"].as<int>();
+  using gtsam::symbol_shorthand::T;
+  using gtsam::symbol_shorthand::P;
 
-  max_vel_x_ = (*config_)["max_vel_x"].as<double>();
-  max_vel_x_backwards_ = (*config_)["max_vel_x_backwards"].as<double>();
-  max_vel_theta_ = (*config_)["max_vel_theta"].as<double>();
-  acc_lim_x_ = (*config_)["acc_lim_x"].as<double>();
-  acc_lim_theta_ = (*config_)["acc_lim_theta"].as<double>();
-  min_turning_radius_ = (*config_)["min_turning_radius"].as<double>();
-  robot_model_ = createRobotFootprint();
+  OptimalPlanner::OptimalPlanner(YAML::Node *config)
+      : config_(config)
+  {
+    autosize_ = (*config_)["autosize"].as<bool>();
+    dt_ref_ = (*config_)["dt_ref"].as<double>();
+    dt_hysteresis_ = (*config_)["dt_hysteresis"].as<double>();
+    min_samples_ = (*config_)["min_samples"].as<int>();
+    max_samples_ = (*config_)["max_samples"].as<int>();
 
-  min_obstacle_dist_ = (*config_)["min_obstacle_dist"].as<double>();
+    max_vel_x_ = (*config_)["max_vel_x"].as<double>();
+    max_vel_x_backwards_ = (*config_)["max_vel_x_backwards"].as<double>();
+    max_vel_theta_ = (*config_)["max_vel_theta"].as<double>();
+    acc_lim_x_ = (*config_)["acc_lim_x"].as<double>();
+    acc_lim_theta_ = (*config_)["acc_lim_theta"].as<double>();
+    min_turning_radius_ = (*config_)["min_turning_radius"].as<double>();
+    robot_model_ = createRobotFootprint();
 
-  penalty_epsilon_ = (*config_)["penalty_epsilon"].as<double>();
-  weight_max_vel_x_ = (*config_)["weight_max_vel_x"].as<double>();
-  weight_max_vel_theta_ = (*config_)["weight_max_vel_theta"].as<double>();
-  weight_kinematics_nh_ = (*config_)["weight_kinematics_nh"].as<double>();
-  weight_kinematics_forward_drive_ = (*config_)["weight_kinematics_forward_drive"].as<double>();
-  weight_kinematics_turning_radius_ = (*config_)["weight_kinematics_turning_radius"].as<double>();
-  weight_optimaltime_ = (*config_)["weight_optimaltime"].as<double>();
-  weight_obstacle_ = (*config_)["weight_obstacle"].as<double>();
+    min_obstacle_dist_ = (*config_)["min_obstacle_dist"].as<double>();
+
+    penalty_epsilon_ = (*config_)["penalty_epsilon"].as<double>();
+    double obstacle_noise = (*config_)["obstacle_noise"].as<double>();
+    double time_noise = (*config_)["time_noise"].as<double>();
+    double velocity_x_noise = (*config_)["velocity_x_noise"].as<double>();
+    double velocity_theta_noise = (*config_)["velocity_theta_noise"].as<double>();
+    double kinematic_forward_noise = (*config_)["kinematic_forward_noise"].as<double>();
+    double kinematic_turning_noise = (*config_)["kinematic_turning_noise"].as<double>();
+
+    obstacle_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(1) << obstacle_noise).finished());
+    time_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(1) << time_noise).finished());
+    velocity_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(2) << velocity_x_noise, velocity_theta_noise).finished());
+    kinematic_noise1_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(1) << kinematic_forward_noise).finished());
+    kinematic_noise2_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(2) << kinematic_forward_noise, kinematic_turning_noise).finished());
+    fix_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(3) << 1e-6, 1e-6, 1e-6).finished());
 }
 
 void OptimalPlanner::autoResize(double dt_ref, double dt_hysteresis, int min_samples, int max_samples, bool fast_mode)
@@ -112,113 +121,120 @@ bool OptimalPlanner::calcTimeDiff()
   if (timestep < 0)
     timestep = 0.2; // TODO: this is an assumption
 
-
-  //todo: liu
-  //double yaw = atan2(diff_last[1], diff_last[0]);
-  //prev.theta() = yaw;
   time_diffs_.push_back(timestep);
+
   return true;
 }
 
-void OptimalPlanner::addPose(double x, double y, double angle)
+void OptimalPlanner::addPose(const Eigen::Vector3d& pose)
 {
-  poses_.emplace_back(x, y, angle);
+  poses_.emplace_back(pose(0), pose(1), pose(2));
   calcTimeDiff();
 }
 
-void OptimalPlanner::addObstacle(double x, double y)
+void OptimalPlanner::addObstacle(const Point2dContainer& obst)
 {
-  obstacles_.push_back(new PointObstacle(x, y));
+  if(obst.size() == 0)
+  {
+  return;
+  }
+  else if(obst.size() == 1)
+  {
+    obstacles_.push_back(new PointObstacle(obst[0]));
+  }
+  else if(obst.size() == 2)
+  {
+    obstacles_.push_back(new LineObstacle(obst[0], obst[1]));
+  }
+  else if(obst.size() >= 3)
+  {
+    obstacles_.push_back(new PolygonObstacle(obst));
+  }
+
+
 }
 
-void OptimalPlanner::addKinematicEdges(ceres::Problem &problem)
-{
-  Eigen::Matrix2d information;
-  
+void OptimalPlanner::addKinematicEdges()
+{  
   //add kinematics edges
   for (size_t i = 0; i < poses_.size() - 1; i++)
   {
-
-    auto &current = poses_[i];
-    auto &next = poses_[i + 1];
-    ceres::CostFunction *cost_function;
-    if (min_turning_radius_ == 0 || weight_kinematics_turning_radius_ == 0)
+    if (min_turning_radius_ == 0)
     {
-      information << weight_kinematics_nh_, 0, 0, weight_kinematics_forward_drive_;
-      cost_function = KinematicsDiffDriveError::Create(information);
+      //TODO: use diff model
+      graph_.emplace_shared<KinematicsDiffDriveFactor>(P(i), P(i + 1), kinematic_noise1_);
+      factor_type_.push_back("KinematicsDiffDriveFactor");
     }
     else
     {
-      information << weight_kinematics_nh_, 0, 0, weight_kinematics_turning_radius_;
-      cost_function = KinematicsCarLikeError::Create(information, min_turning_radius_);
+      graph_.emplace_shared<KinematicsCarLikeFactor>(P(i), P(i + 1),
+                                                     min_turning_radius_,
+                                                     kinematic_noise2_);
+      factor_type_.push_back("KinematicsCarLikeFactor");
     }
+  }
+  int start_id = 0;
+  int goal_id = poses_.size() - 1;
+  graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(start_id),
+                                              gtsam::Pose2(poses_[start_id].x(),
+                                                           poses_[start_id].y(),
+                                                           poses_[start_id].theta()),
+                                              fix_noise_));
+  factor_type_.push_back("PriorFactor");
+  graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(goal_id),
+                                              gtsam::Pose2(poses_[goal_id].x(),
+                                                           poses_[goal_id].y(),
+                                                           poses_[goal_id].theta()),
+                                              fix_noise_));
+  factor_type_.push_back("PriorFactor");
+}
 
-    problem.AddResidualBlock(cost_function, nullptr,
-                             &current.x(),
-                             &current.y(),
-                             &current.theta(),
-                             &next.x(),
-                             &next.y(),
-                             &next.theta());
-    //set the start and goal as fixed vectices.
-    //set the first node as start
-    if (i == 0)
+void OptimalPlanner::addObstacleEdges()
+{
+  double dist_fn = std::max(min_obstacle_dist_ * 3, 4.);
+
+  for (size_t i = 0; i < obstacles_.size(); i++)
+  {
+    for (size_t j = 0; j < poses_.size(); j++)
     {
-      problem.SetParameterBlockConstant(reinterpret_cast<double *>(&current.x()));
-      problem.SetParameterBlockConstant(reinterpret_cast<double *>(&current.y()));
-      problem.SetParameterBlockConstant(reinterpret_cast<double *>(&current.theta()));
-    }
-    //set the last node as goal
-    if (i == poses_.size() - 2)
-    {
-      problem.SetParameterBlockConstant(reinterpret_cast<double *>(&next.x()));
-      problem.SetParameterBlockConstant(reinterpret_cast<double *>(&next.y()));
-      problem.SetParameterBlockConstant(reinterpret_cast<double *>(&next.theta()));
+      double dist = robot_model_->calculateDistance(poses_[j], obstacles_[i]);
+
+      if (dist > dist_fn)
+        continue;
+
+      graph_.emplace_shared<ObstacleFactor>(P(j),
+                                            robot_model_,
+                                            obstacles_[i],
+                                            min_obstacle_dist_,
+                                            penalty_epsilon_,
+                                            obstacle_noise_);
+      factor_type_.push_back("ObstacleFactor");
     }
   }
 }
 
-void OptimalPlanner::addTimeEdges(ceres::Problem &problem)
+void OptimalPlanner::addTimeEdges()
 {
-  Eigen::Matrix<double, 1, 1> information;
-  information << weight_optimaltime_;
-
   for (size_t i = 0; i < time_diffs_.size(); i++)
   {
-    auto &dt = time_diffs_[i];
 
-    ceres::CostFunction *cost_function = TimeError::Create(information);
-
-    problem.AddResidualBlock(cost_function, nullptr, &dt);
+    graph_.emplace_shared<TimeFactor>(T(i), time_diffs_[i], time_noise_);
+    factor_type_.push_back("TimeFactor");
   }
 }
 
-void OptimalPlanner::addVelocityEdges(ceres::Problem &problem)
+void OptimalPlanner::addVelocityEdges()
 {
-  Eigen::Matrix2d information;
-  information << weight_max_vel_x_, 0, 0, weight_max_vel_theta_;
-  //add kinematics edges
-  for (size_t i = 0; i < time_diffs_.size(); i++)
+
+  for (size_t i = 0; i < poses_.size() - 1; i++)
   {
-
-    auto &current = poses_[i];
-    auto &next = poses_[i + 1];
-    auto &dt = time_diffs_[i];
-
-    ceres::CostFunction *cost_function = VelocityError::Create(information,
-                                                               max_vel_x_backwards_,
-                                                               max_vel_x_,
-                                                               max_vel_theta_,
-                                                               penalty_epsilon_);
-
-    problem.AddResidualBlock(cost_function, nullptr,
-                             &current.x(),
-                             &current.y(),
-                             &current.theta(),
-                             &next.x(),
-                             &next.y(),
-                             &next.theta(),
-                             &dt);
+    graph_.emplace_shared<VelocityFactor>(P(i), P(i + 1), T(i),
+                                          max_vel_x_backwards_,
+                                          max_vel_x_,
+                                          max_vel_theta_,
+                                          penalty_epsilon_,
+                                          velocity_noise_);
+    factor_type_.push_back("VelocityFactor");
   }
 }
 
@@ -234,19 +250,19 @@ BaseRobotFootprintModel *OptimalPlanner::createRobotFootprint()
   // circular
   if (model_name.compare("circular") == 0)
   {
-    printf("%s, unimplemented!\n", model_name.c_str());
+    printf("%s, It is not implemented!\n", model_name.c_str());
     exit(0);
   }
   // line
   if (model_name.compare("line") == 0)
   {
-    printf("%s, unimplemented!\n", model_name.c_str());
+    printf("%s, It is not implemented!\n", model_name.c_str());
     exit(0);
   }
   // two circles
   if (model_name.compare("two_circles") == 0)
   {
-    printf("%s, unimplemented!\n", model_name.c_str());
+    printf("%s, It is not implemented!\n", model_name.c_str());
     exit(0);
   }
   // polygon
@@ -267,35 +283,6 @@ BaseRobotFootprintModel *OptimalPlanner::createRobotFootprint()
   return nullptr;
 }
 
-void OptimalPlanner::addObstacleEdges(ceres::Problem &problem)
-{
-  Eigen::Matrix<double, 1, 1> information;
-  information << weight_obstacle_;
-
-  for (size_t i = 0; i < obstacles_.size(); i++)
-  {
-    ceres::CostFunction *cost_function =
-        ObstacleError::Create(information,
-                              robot_model_,
-                              obstacles_[i],
-                              min_obstacle_dist_,
-                              penalty_epsilon_);
-
-    for (size_t j = 0; j < poses_.size(); j++)
-    {
-      auto &current = poses_[j];
-      double dist = obstacles_[i]->getMinimumDistance(current.position());
-
-      if (dist > 4)
-        continue;
-
-      problem.AddResidualBlock(cost_function, NULL,
-                               &current.x(),
-                               &current.y(),
-                               &current.theta());
-    }
-  }
-}
 
 void OptimalPlanner::solve()
 {
@@ -305,49 +292,122 @@ void OptimalPlanner::solve()
     autoResize(dt_ref_, dt_hysteresis_, min_samples_, max_samples_, false);
   }
 
-  ceres::Problem problem;
+  for(uint32_t i = 0; i < poses_.size(); i++)
+  {
+    values_.insert( P(i), gtsam::Pose2(poses_[i].x(), poses_[i].y(), poses_[i].theta()));
+  }
 
-  addKinematicEdges(problem);
-  addObstacleEdges(problem);
-  addVelocityEdges(problem);
-  addTimeEdges(problem);
+  for(uint32_t i = 0; i < time_diffs_.size(); i++)
+  {
+    values_.insert( T(i), gtsam::Vector1(time_diffs_[i]));
+  }
+  //Constraints of robot kinematics
+  addKinematicEdges();
+  //Constraints of obstacle distance
+  addObstacleEdges();
+  //Speed Constraints
+  addVelocityEdges();
+  //Time Constraints
+  addTimeEdges();
 
-  ceres::Problem::EvaluateOptions evaluate_options;
-  double total_cost = 0.0;
-  std::vector<double> residuals;
-  problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
-  std::cout << "Initial total cost:" << total_cost << "\n";
-  #if 1
+  gtsam::LevenbergMarquardtParams parameters;
+  parameters.relativeErrorTol = 1e-5;
+  parameters.maxIterations = 100;
 
-  ceres::Solver::Options options;
-  options.max_num_iterations = 100;
-  options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
+  gtsam::LevenbergMarquardtOptimizer optimizer(graph_, values_, parameters);
+  result_ = optimizer.optimize();
 
-  ceres::Solver::Summary summary;
-  ceres::Solve(options, &problem, &summary);
 
-  problem.Evaluate(evaluate_options, &total_cost, &residuals, nullptr, nullptr);
-  std::cout << "Finial total cost:" << total_cost << "\n";
+  for (uint32_t i = 0; i < poses_.size(); ++i)
+  {
+    gtsam::Pose2 pose = result_.at<gtsam::Pose2>(P(i));
+    poses_[i] = PoseSE2(pose.x(), pose.y(), pose.theta());
+  }
+
+  for (uint32_t i = 0; i < time_diffs_.size(); ++i)
+  {
+    gtsam::Vector1 dt = result_.at<gtsam::Vector1>(T(i));
+    time_diffs_[i] = dt(0);
+  }
 
   std::ofstream myfile;
-  char src[200];
 
-  myfile.open("/home/liu/workspace/teb/script/new_path.txt");
+  myfile.open("../script/new_path.txt");
+
   for (auto &current : poses_)
   {
-    sprintf(src, "PATH: %5.2lf %5.2lf %5.2lf\r\n", current.x(), current.y(), normalize_theta(current.theta()));
-    myfile << src;
+    const std::string str = (boost::format("PATH: %5.2f %5.2f %5.2f\n") % current.x() % current.y() % current.theta()).str();
+    myfile << str;
   }
 
   for (auto &current : obstacles_)
   {
-    auto &pose = current->getCentroid();
+    geometry_msgs::Polygon polygon;
+    current->toPolygonMsg(polygon);
 
-    sprintf(src, "OBST: %5.2lf %5.2lf\r\n", pose.x(), pose.y());
-    myfile << src;
+    std::string str = std::string("OBST: ");
+
+    for(auto point : polygon.points)
+    {
+      str += (boost::format("%5.2f %5.2f ") % point.x % point.y).str();
+    }
+    str += std::string("\n");
+    myfile << str;
   }
   myfile.close();
-  #endif
+}
+
+void OptimalPlanner::report()
+{
+  double error0 = 0;
+  double error1 = 0;
+  std::map<std::string, std::vector<double>> type_score;
+  for (uint i = 0; i < graph_.size(); i++)
+  {
+    auto &factor = graph_.at(i);
+    double err0 = factor->error(values_);
+    double err1 = factor->error(result_);
+    if (type_score.count(factor_type_[i]) == 0)
+    {
+      type_score[factor_type_[i]] = {err0, err1};
+    }
+    else
+    {
+      type_score[factor_type_[i]][0] += err0;
+      type_score[factor_type_[i]][1] += err1;
+    }
+    error0 += err0;
+    error1 += err1;
+  }
+  printf("-----------------\n");
+  printf("Overall error: %f --> %f.\n", error0, error1);
+  for (auto m : type_score)
+  {
+    auto name = m.first;
+    auto score = m.second;
+    printf("  --> Factor %s : %f --> %f.\n", name.c_str(), score[0], score[1]);
+  }
+  printf("-----------------\n");
+}
+
+double OptimalPlanner::getCloestDist()
+{
+  double closest_dist = INFINITY;
+  double avg_dist = 0;
+  for (size_t i = 0; i < obstacles_.size(); i++)
+  {
+    for (size_t j = 0; j < poses_.size(); j++)
+    {
+      double dist = robot_model_->calculateDistance(poses_[j], obstacles_[i]);
+      if(closest_dist > dist)
+        closest_dist = dist;
+      avg_dist += dist;
+      
+      //printf("the distance form obstacle %d to pose %d is %f\n", i, j, dist);
+    }
+  }
+  printf("The closest distance is %f\n", closest_dist);
+  return closest_dist;
 }
 
 } // namespace teb_demo

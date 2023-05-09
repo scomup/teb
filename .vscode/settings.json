@@ -52,6 +52,23 @@
         "qquickview": "cpp",
         "qwidget": "cpp",
         "qapplication": "cpp",
-        "core": "cpp"
+        "core": "cpp",
+        "csignal": "cpp",
+        "hash_map": "cpp",
+        "hash_set": "cpp",
+        "bitset": "cpp",
+        "forward_list": "cpp",
+        "unordered_set": "cpp",
+        "algorithm": "cpp",
+        "iterator": "cpp",
+        "map": "cpp",
+        "memory_resource": "cpp",
+        "optional": "cpp",
+        "random": "cpp",
+        "set": "cpp",
+        "string": "cpp",
+        "string_view": "cpp",
+        "slist": "cpp",
+        "cfenv": "cpp"
     }
 }

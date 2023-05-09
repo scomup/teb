@@ -39,10 +39,10 @@ namespace teb_demo {
 // Normalizes the angle in radians between [-pi and pi).
 template <typename T>
 inline T NormalizeAngle(const T& angle_radians) {
-  // Use ceres::floor because it is specialized for double and Jet types.
+  // Use std::floor because it is specialized for double and Jet types.
   T two_pi(2.0 * M_PI);
   return angle_radians -
-      two_pi * ceres::floor((angle_radians + T(M_PI)) / two_pi);
+      two_pi * std::floor((angle_radians + T(M_PI)) / two_pi);
 }
 
 }  // namespace examples

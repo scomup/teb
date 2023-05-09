@@ -1,17 +1,18 @@
 #!/usr/bin/python
 # coding: UTF-8
 
-import random
 import numpy as np
 from math import *
 import matplotlib.pyplot as plt       
 from matplotlib.widgets import Button
-import itertools
 import re
 import subprocess
 import yaml
-import sys
-win_size = 0.5
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
+
+
+win_size = 10
 def fprintf(stream, format_spec, *args):
     stream.write(format_spec % args)
 
@@ -19,13 +20,13 @@ class GUI(object):
     def __init__(self):
         self.idx = 0
         self.fig, self.ax = plt.subplots()
-        self.ax.set_xlim([-18*win_size,18*win_size])
-        self.ax.set_ylim([-10*win_size,10*win_size])
+        self.ax.axis('equal')
+        self.ax.set_xlim([-win_size,win_size])
+        self.ax.set_ylim([-win_size,win_size])
         self.cur_pose = [0,0]
 
-        self.path = []
-        self.path_new = []
-        self.obst = []
+        self.paths = []
+        self.obsts = []
 
         self.bclear = Button(plt.axes([0.00, 0.002, 0.12, 0.045]), 'clear')
         self.bclear.on_clicked(self.on_clear)
@@ -36,6 +37,8 @@ class GUI(object):
         self.bpath.color = 'green'
         self.bpath.hovercolor = self.bpath.color
         self.bpath.ax.set_facecolor(self.bpath.color)
+
+        self.current_points = []
 
         self.bsave = Button(plt.axes([0.50, 0.002, 0.12, 0.045]), 'save')
         self.bsave.on_clicked(self.on_save)
@@ -54,8 +57,8 @@ class GUI(object):
         plt.show()
 
     def load_config(self):
-        config_file = open("/home/liu/workspace/teb/config/sample.yaml", "r")
-        config = yaml.load(config_file)
+        config_file = open("../config/sample.yaml", "r")
+        config = yaml.load(config_file,Loader=yaml.Loader)
         self.min_dist = config["min_obstacle_dist"]  
         self.model_name = config["footprint_model"]["type"]
         self.polygon = np.matrix(config["footprint_model"]["vertices"])
@@ -63,14 +66,14 @@ class GUI(object):
 
 
     def on_clear(self, event):
-        self.path = []
-        self.obst = []
+        self.paths = []
+        self.obsts = []
         self.update()
 
     def on_run(self, event):
         #self.save("path.txt")
-        subprocess.call(["/home/liu/workspace/teb/build/teb_demo"])
-        self.load("new_path.txt")
+        subprocess.call(["../build/teb_demo"])
+        self.load("../script/new_path.txt")
         self.update()
 
     def on_click(self, event):
@@ -78,15 +81,23 @@ class GUI(object):
             if self.bpath_is_checked:
                 self.cur_pose = [event.xdata, event.ydata]
             else:
-                self.obst.append([event.xdata, event.ydata])
-                self.update()
+                if event.key == 'shift':
+                    self.current_points.append([event.xdata, event.ydata])   
+                else:
+                    self.obsts.append([[event.xdata, event.ydata]])
+                    self.update()
+        elif event.button == 3 and  event.inaxes == self.ax: #right click to close polygon
+            self.obsts.append(self.current_points)
+            self.current_points = []
+        self.update()
 
+                
     def on_release(self, event):
         if event.button == 1 and  event.inaxes == self.ax:
             if self.bpath_is_checked:
                 vector = [event.xdata-self.cur_pose[0], event.ydata-self.cur_pose[1]]
                 theta = atan2(vector[1],vector[0])
-                self.path.append([self.cur_pose[0], self.cur_pose[1], theta])
+                self.paths.append([self.cur_pose[0], self.cur_pose[1], theta])
                 self.update()
 
     def on_save(self, event):
@@ -95,34 +106,42 @@ class GUI(object):
 
     def save(self, file_name):
         file = open(file_name,"w")
-        for p in self.path:
-            fprintf(file, "PATH: %f %f %f\n", p[0],p[1],p[2]) 
-        for o in self.obst:
-            fprintf(file, "OBST: %f %f\n", o[0],o[1]) 
+        for pose in self.paths:
+            fprintf(file, "PATH: %f %f %f\n", pose[0],pose[1],pose[2]) 
+        for obst in self.obsts:
+            fprintf(file, "OBST:") 
+            for point in obst:
+                fprintf(file, " %f %f", point[0], point[1]) 
+            fprintf(file, "\n") 
             
         file.close()
 
     def on_load(self, event):
-        self.path = []
-        self.obst = []
+        self.paths = []
+        self.obsts = []
         self.load("path.txt")
         self.update()
         
 
     def load(self, file_name):
         self.load_config()
-        self.path = []
-        self.obst = []
+        self.paths = []
+        self.obsts = []
         file = open(file_name)
         lines = file.readlines()
         for line in lines:
             txt = re.split(r'\s+', line)
             if(txt[0] == 'PATH:'):
-                self.path.append([float(txt[1]), float(txt[2]), float(txt[3])])
+                self.paths.append([float(txt[1]), float(txt[2]), float(txt[3])])
             if(txt[0] == 'OBST:'):
-                self.obst.append([float(txt[1]), float(txt[2])])
-            if(txt[0] == 'PATH_NEW:'):
-                self.path_new.append([float(txt[1]), float(txt[2])])
+                obst = []
+                for i in range(1, len(txt)):
+                    try:
+                        obst.append(float(txt[i]))
+                    except:
+                        pass
+                obst = np.array(obst).reshape(-1,2)
+                self.obsts.append(obst)
         file.close()
 
     def on_path(self, event):
@@ -130,7 +149,6 @@ class GUI(object):
             self.bpath_is_checked = False
             self.bpath.color = 'blue'
             self.bpath.label.set_text("draw obst") 
-
             #self.bpath.name = 'draw path'
         else:
             self.bpath_is_checked == False
@@ -138,6 +156,7 @@ class GUI(object):
             self.bpath.color = 'green'
             self.bpath.label.set_text("draw path")
             #self.bpath.name = 'draw obst'
+
         self.bpath.hovercolor = self.bpath.color
         self.bpath.ax.set_facecolor(self.bpath.color)
         self.fig.canvas.draw()
@@ -146,32 +165,37 @@ class GUI(object):
 
     def press(self, event):
         if event.key == 'r':
-            self.obst = []
-            self.path = []
+            self.obsts = []
+            self.paths = []
             self.update()
             
     def update(self):
         self.ax.cla()
-        self.ax.set_xlim([-18*win_size,18*win_size])
-        self.ax.set_ylim([-10*win_size,10*win_size])
+        self.ax.set_xlim([-win_size,win_size])
+        self.ax.set_ylim([-win_size,win_size])
 
-        if len(self.path_new) != 0:
-            path = np.array(self.path_new)
-            self.ax.plot(path[:,0], path[:,1], c='r')
-            self.ax.scatter(path[:,0], path[:,1], c='r')
+        if len(self.obsts) != 0:
+            for obst in self.obsts:
+                obst = np.array(obst)
+                if(obst.shape[0] == 1):
+                    self.ax.scatter(obst[0,0], obst[0,1], c='b')
+                elif(obst.shape[0] == 2):
+                    self.ax.plot(obst[:,0], obst[:,1], 'b-')
+                elif(obst.shape[0] >= 3):
+                    polygon = Polygon(obst, closed=True)
+                    self.ax.add_patch(polygon)
 
-        if len(self.obst) != 0:
-            obst = np.array(self.obst)
-            self.ax.scatter(obst[:,0], obst[:,1], c='b')
-            for o in obst:
-                self.ax.add_patch(plt.Circle((o[0], o[1]), self.min_dist, color='b', alpha=0.1))
+        if len(self.current_points) != 0:
+            current_points = np.array(self.current_points)
+            self.ax.plot(current_points[:,0], current_points[:,1], 'b-')
+            self.ax.scatter(current_points[:,0], current_points[:,1], c='b')
 
 
-        if len(self.path) != 0:
-            path = np.array(self.path)
+        if len(self.paths) != 0:
+            path = np.array(self.paths)
             self.ax.plot(path[:,0], path[:,1], c='g',linewidth=0.5)
             vec = []
-            for p in self.path:
+            for p in self.paths:
                 c, s = np.cos(p[2]), np.sin(p[2])
                 R = np.matrix(((c,-s), (s, c)))
                 v = R*np.matrix([[1],[0]])
@@ -181,10 +205,6 @@ class GUI(object):
                 polygon = polygon.transpose()
                 polygon = polygon + np.tile( np.array([p[0], p[1]]), (self.polygon.shape[0], 1))
                 self.ax.add_patch(plt.Polygon(polygon, color='g', alpha=0.1))
-                #plt.pause(0.1)
-                #self.ax.cla()
-                #self.ax.set_xlim([-18*win_size,18*win_size])
-                #self.ax.set_ylim([-10*win_size,10*win_size])
             vec = np.array(vec)
             self.ax.quiver(path[:,0], path[:,1], vec[:,0], vec[:,1], color='g',width=0.001, scale= 30)
 
@@ -192,4 +212,6 @@ class GUI(object):
         plt.draw()
 
 if __name__ == "__main__":
+    print("Hold 'Shift' while clicking the left mouse button to add a point for polygon or line.")
+    print("Clicking the right mouse button to close a polygon or line.")
     gui = GUI()

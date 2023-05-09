@@ -203,10 +203,4 @@ void PolygonObstacle::toPolygonMsg(geometry_msgs::Polygon& polygon)
 }
 
 
-
-
-
-
-
-
 } // namespace teb_local_planner
