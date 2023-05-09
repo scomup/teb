@@ -13,6 +13,8 @@
 using namespace teb_demo;
 int main(int argc, char **argv)
 {
+    printf("=========================\n");
+
     LogFile f("../script/path.txt");
     YAML::Node config = YAML::LoadFile("../config/sample.yaml");
     OptimalPlanner teb(&config);
@@ -24,6 +26,8 @@ int main(int argc, char **argv)
     {
         teb.addObstacle(obst);
     }
+    teb.getCloestDist();
     teb.solve();
     teb.report();
+    teb.getCloestDist();
 }

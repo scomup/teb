@@ -61,6 +61,7 @@ public:
   void addObstacle(const Point2dContainer& obst);
   void solve();
   void report();
+  double getCloestDist();
 
 private:
   void autoResize(double dt_ref, double dt_hysteresis, int min_samples, int max_samples, bool fast_mode);

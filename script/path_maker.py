@@ -26,9 +26,7 @@ class GUI(object):
         self.cur_pose = [0,0]
 
         self.paths = []
-        self.path_new = []
         self.obsts = []
-        self.polygons = []
 
         self.bclear = Button(plt.axes([0.00, 0.002, 0.12, 0.045]), 'clear')
         self.bclear.on_clicked(self.on_clear)
@@ -74,7 +72,6 @@ class GUI(object):
 
     def on_run(self, event):
         #self.save("path.txt")
-        self.save("path.txt")
         subprocess.call(["../build/teb_demo"])
         self.load("../script/new_path.txt")
         self.update()
@@ -176,11 +173,6 @@ class GUI(object):
         self.ax.cla()
         self.ax.set_xlim([-win_size,win_size])
         self.ax.set_ylim([-win_size,win_size])
-
-        if len(self.path_new) != 0:
-            path = np.array(self.path_new)
-            self.ax.plot(path[:,0], path[:,1], c='r')
-            self.ax.scatter(path[:,0], path[:,1], c='r')
 
         if len(self.obsts) != 0:
             for obst in self.obsts:

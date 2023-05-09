@@ -14,6 +14,7 @@ namespace teb_demo
   {
   protected:
     double min_turning_radius_;
+    double weight_kinematics_turning_radius_;
     typedef gtsam::NoiseModelFactor2<gtsam::Pose2, gtsam::Pose2> Base;
 
   public:

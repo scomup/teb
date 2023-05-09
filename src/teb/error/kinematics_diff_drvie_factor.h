@@ -13,7 +13,6 @@ namespace teb_demo
   class KinematicsDiffDriveFactor : public gtsam::NoiseModelFactor2<gtsam::Pose2, gtsam::Pose2>
   {
   protected:
-    double min_turning_radius_;
     typedef gtsam::NoiseModelFactor2<gtsam::Pose2, gtsam::Pose2> Base;
 
   public:
@@ -21,10 +20,8 @@ namespace teb_demo
 
     KinematicsDiffDriveFactor(
         const gtsam::Key &xi_key, const gtsam::Key &xj_key,
-        const double min_turning_radius,
         const gtsam::SharedNoiseModel &noiseModel)
-        : Base(noiseModel, xi_key, xj_key),
-          min_turning_radius_(min_turning_radius)
+        : Base(noiseModel, xi_key, xj_key)
     {
     }
 
@@ -38,7 +35,6 @@ namespace teb_demo
 
       const double yaw1 = pose1.theta();
       const double yaw2 = pose2.theta();
-
 
       double theta0 = cos(yaw1) * deltaS(1) - sin(yaw1) * deltaS(0);
       double theta1 = -cos(yaw2) * deltaS(1) + sin(yaw2) * deltaS(0);

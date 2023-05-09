@@ -38,20 +38,18 @@ namespace teb_demo
     min_obstacle_dist_ = (*config_)["min_obstacle_dist"].as<double>();
 
     penalty_epsilon_ = (*config_)["penalty_epsilon"].as<double>();
-    weight_max_vel_x_ = (*config_)["weight_max_vel_x"].as<double>();
-    weight_max_vel_theta_ = (*config_)["weight_max_vel_theta"].as<double>();
-    weight_kinematics_forward_drive_ = (*config_)["weight_kinematics_forward_drive"].as<double>();
-    weight_kinematics_turning_radius_ = (*config_)["weight_kinematics_turning_radius"].as<double>();
     double obstacle_noise = (*config_)["obstacle_noise"].as<double>();
     double time_noise = (*config_)["time_noise"].as<double>();
-    double velocity_noise = (*config_)["velocity_noise"].as<double>();
-    double kinematic_noise = (*config_)["kinematic_noise"].as<double>();
+    double velocity_x_noise = (*config_)["velocity_x_noise"].as<double>();
+    double velocity_theta_noise = (*config_)["velocity_theta_noise"].as<double>();
+    double kinematic_forward_noise = (*config_)["kinematic_forward_noise"].as<double>();
+    double kinematic_turning_noise = (*config_)["kinematic_turning_noise"].as<double>();
 
     obstacle_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(1) << obstacle_noise).finished());
     time_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(1) << time_noise).finished());
-    velocity_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(2) << velocity_noise, velocity_noise).finished());
-    kinematic_noise1_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(1) << kinematic_noise).finished());
-    kinematic_noise2_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(2) << kinematic_noise, kinematic_noise).finished());
+    velocity_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(2) << velocity_x_noise, velocity_theta_noise).finished());
+    kinematic_noise1_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(1) << kinematic_forward_noise).finished());
+    kinematic_noise2_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(2) << kinematic_forward_noise, kinematic_turning_noise).finished());
     fix_noise_ = gtsam::noiseModel::Diagonal::Variances((gtsam::Vector(3) << 1e-6, 1e-6, 1e-6).finished());
 }
 
@@ -161,30 +159,39 @@ void OptimalPlanner::addKinematicEdges()
   //add kinematics edges
   for (size_t i = 0; i < poses_.size() - 1; i++)
   {
-
-    if (min_turning_radius_ == 0 || weight_kinematics_turning_radius_ == 0)
+    if (min_turning_radius_ == 0)
     {
       //TODO: use diff model
-      graph_.emplace_shared<KinematicsDiffDriveFactor>(P(i), P(i + 1), min_turning_radius_, kinematic_noise1_);
+      graph_.emplace_shared<KinematicsDiffDriveFactor>(P(i), P(i + 1), kinematic_noise1_);
       factor_type_.push_back("KinematicsDiffDriveFactor");
     }
     else
     {
-      graph_.emplace_shared<KinematicsCarLikeFactor>(P(i), P(i + 1), min_turning_radius_, kinematic_noise1_);
+      graph_.emplace_shared<KinematicsCarLikeFactor>(P(i), P(i + 1),
+                                                     min_turning_radius_,
+                                                     kinematic_noise2_);
       factor_type_.push_back("KinematicsCarLikeFactor");
     }
   }
   int start_id = 0;
   int goal_id = poses_.size() - 1;
-  graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(start_id), gtsam::Pose2(poses_[start_id].x(),poses_[start_id].y(),poses_[start_id].theta()), fix_noise_));
+  graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(start_id),
+                                              gtsam::Pose2(poses_[start_id].x(),
+                                                           poses_[start_id].y(),
+                                                           poses_[start_id].theta()),
+                                              fix_noise_));
   factor_type_.push_back("PriorFactor");
-  graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(goal_id), gtsam::Pose2(poses_[goal_id].x(),poses_[goal_id].y(),poses_[goal_id].theta()), fix_noise_));
+  graph_.add(gtsam::PriorFactor<gtsam::Pose2>(P(goal_id),
+                                              gtsam::Pose2(poses_[goal_id].x(),
+                                                           poses_[goal_id].y(),
+                                                           poses_[goal_id].theta()),
+                                              fix_noise_));
   factor_type_.push_back("PriorFactor");
-
 }
 
 void OptimalPlanner::addObstacleEdges()
 {
+  double dist_fn = std::max(min_obstacle_dist_ * 3, 4.);
 
   for (size_t i = 0; i < obstacles_.size(); i++)
   {
@@ -192,7 +199,7 @@ void OptimalPlanner::addObstacleEdges()
     {
       double dist = robot_model_->calculateDistance(poses_[j], obstacles_[i]);
 
-      if (dist > min_obstacle_dist_ * 3)
+      if (dist > dist_fn)
         continue;
 
       graph_.emplace_shared<ObstacleFactor>(P(j),
@@ -294,10 +301,13 @@ void OptimalPlanner::solve()
   {
     values_.insert( T(i), gtsam::Vector1(time_diffs_[i]));
   }
-
+  //Constraints of robot kinematics
   addKinematicEdges();
+  //Constraints of obstacle distance
   addObstacleEdges();
+  //Speed Constraints
   addVelocityEdges();
+  //Time Constraints
   addTimeEdges();
 
   gtsam::LevenbergMarquardtParams parameters;
@@ -369,7 +379,7 @@ void OptimalPlanner::report()
     error0 += err0;
     error1 += err1;
   }
-  printf("=========================\n");
+  printf("-----------------\n");
   printf("Overall error: %f --> %f.\n", error0, error1);
   for (auto m : type_score)
   {
@@ -377,7 +387,11 @@ void OptimalPlanner::report()
     auto score = m.second;
     printf("  --> Factor %s : %f --> %f.\n", name.c_str(), score[0], score[1]);
   }
+  printf("-----------------\n");
+}
 
+double OptimalPlanner::getCloestDist()
+{
   double closest_dist = INFINITY;
   double avg_dist = 0;
   for (size_t i = 0; i < obstacles_.size(); i++)
@@ -392,8 +406,8 @@ void OptimalPlanner::report()
       //printf("the distance form obstacle %d to pose %d is %f\n", i, j, dist);
     }
   }
-  
   printf("The closest distance is %f\n", closest_dist);
+  return closest_dist;
 }
 
 } // namespace teb_demo
