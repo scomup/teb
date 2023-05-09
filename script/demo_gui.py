@@ -24,14 +24,14 @@ class GUI(object):
         self.ax.set_xlim([-win_size,win_size])
         self.ax.set_ylim([-win_size,win_size])
         self.cur_pose = [0,0]
-
+        self.play_cnt = -1
         self.paths = []
         self.obsts = []
 
-        self.bclear = Button(plt.axes([0.00, 0.002, 0.12, 0.045]), 'clear')
+        self.bclear = Button(plt.axes([0.00, 0.002, 0.11, 0.045]), 'clear')
         self.bclear.on_clicked(self.on_clear)
 
-        self.bpath = Button(plt.axes([0.35, 0.002, 0.12, 0.045]), 'draw path')
+        self.bpath = Button(plt.axes([0.33, 0.002, 0.11, 0.045]), 'draw path')
         self.bpath.on_clicked(self.on_path)
         self.bpath_is_checked = True
         self.bpath.color = 'green'
@@ -40,21 +40,36 @@ class GUI(object):
 
         self.current_points = []
 
-        self.bsave = Button(plt.axes([0.50, 0.002, 0.12, 0.045]), 'save')
+        self.bsave = Button(plt.axes([0.45, 0.002, 0.11, 0.045]), 'save')
         self.bsave.on_clicked(self.on_save)
         
-        self.bload = Button(plt.axes([0.65, 0.002, 0.12, 0.045]), 'load')
+        self.bload = Button(plt.axes([0.57, 0.002, 0.11, 0.045]), 'load')
         self.bload.on_clicked(self.on_load)
 
-        self.brun = Button(plt.axes([0.80, 0.002, 0.12, 0.045]), 'run')
+        self.brun = Button(plt.axes([0.69, 0.002, 0.11, 0.045]), 'run')
         self.brun.on_clicked(self.on_run)
+
+        self.bplay = Button(plt.axes([0.81, 0.002, 0.11, 0.045]), 'play')
+        self.bplay.on_clicked(self.on_play)
+
 
         self.fig.canvas.mpl_connect('key_press_event', self.press)
         self.fig.canvas.mpl_connect('button_press_event', self.on_click)
         self.fig.canvas.mpl_connect('button_release_event', self.on_release)
+        self.timer = self.fig.canvas.new_timer(interval=100)
+        self.timer.add_callback(self.play_update)
+        self.timer.start()
 
         self.load_config()
         plt.show()
+
+    def play_update(self):
+        if self.play_cnt != -1:
+            self.update()
+            self.play_cnt += 1
+            if(self.play_cnt > len(self.paths)):
+                self.play_cnt = -1
+
 
     def load_config(self):
         config_file = open("../config/sample.yaml", "r")
@@ -63,15 +78,16 @@ class GUI(object):
         self.model_name = config["footprint_model"]["type"]
         self.polygon = np.matrix(config["footprint_model"]["vertices"])
 
-
-
     def on_clear(self, event):
         self.paths = []
         self.obsts = []
         self.update()
 
+    def on_play(self, event):
+        self.play_cnt = 0
+
     def on_run(self, event):
-        #self.save("path.txt")
+        print("here1")
         subprocess.call(["../build/teb_demo", "path.txt", "../config/sample.yaml"])
         self.load("new_path.txt")
         self.update()
@@ -190,26 +206,35 @@ class GUI(object):
             self.ax.plot(current_points[:,0], current_points[:,1], 'b-')
             self.ax.scatter(current_points[:,0], current_points[:,1], c='b')
 
-
-        if len(self.paths) != 0:
-            path = np.array(self.paths)
-            self.ax.plot(path[:,0], path[:,1], c='g',linewidth=0.5)
-            vec = []
-            for p in self.paths:
-                c, s = np.cos(p[2]), np.sin(p[2])
-                R = np.matrix(((c,-s), (s, c)))
-                v = R*np.matrix([[1],[0]])
-                vec.append([v[0,0], v[1,0]])
-                R = np.matrix(((c,-s), (s, c)))
-                polygon = R * np.matrix(self.polygon.transpose())
-                polygon = polygon.transpose()
-                polygon = polygon + np.tile( np.array([p[0], p[1]]), (self.polygon.shape[0], 1))
-                self.ax.add_patch(plt.Polygon(polygon, color='g', alpha=0.1))
-            vec = np.array(vec)
-            self.ax.quiver(path[:,0], path[:,1], vec[:,0], vec[:,1], color='g',width=0.001, scale= 30)
-
+        self.draw_paths()
 
         plt.draw()
+
+    def draw_paths(self):
+        if(len(self.paths) == 0):
+            return
+        
+        n = self.play_cnt
+        if n > len(self.paths) or n == -1:
+            n = len(self.paths)
+
+        path = np.array(self.paths)
+        self.ax.plot(path[0:n,0], path[0:n,1], c='g',linewidth=0.5)
+        vec = []
+        for p in path[0:n,:]:
+            c, s = np.cos(p[2]), np.sin(p[2])
+            R = np.matrix(((c,-s), (s, c)))
+            v = R*np.matrix([[1],[0]])
+            vec.append([v[0,0], v[1,0]])
+            R = np.matrix(((c,-s), (s, c)))
+            polygon = R * np.matrix(self.polygon.transpose())
+            polygon = polygon.transpose()
+            polygon = polygon + np.tile( np.array([p[0], p[1]]), (self.polygon.shape[0], 1))
+            self.ax.add_patch(plt.Polygon(polygon, color='g', alpha=0.1))
+        vec = np.array(vec)
+
+        #self.ax.quiver(path[0:n,0], path[0:n,1], vec[0:n,0], vec[0:n,1], color='g',width=0.001, scale= 30)
+
 
 if __name__ == "__main__":
     print("Hold 'Shift' while clicking the left mouse button to add a point for polygon or line.")
