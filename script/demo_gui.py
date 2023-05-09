@@ -4,12 +4,11 @@
 import numpy as np
 from math import *
 import matplotlib.pyplot as plt       
-from matplotlib.widgets import Button
+from matplotlib.widgets import Button, CheckButtons
 import re
 import subprocess
 import yaml
 from matplotlib.patches import Polygon
-from matplotlib.collections import PatchCollection
 
 
 win_size = 10
@@ -49,9 +48,8 @@ class GUI(object):
         self.brun = Button(plt.axes([0.69, 0.002, 0.11, 0.045]), 'run')
         self.brun.on_clicked(self.on_run)
 
-        self.bplay = Button(plt.axes([0.81, 0.002, 0.11, 0.045]), 'play')
-        self.bplay.on_clicked(self.on_play)
 
+        self.animation_check = CheckButtons(plt.axes([0.81, 0.002, 0.11, 0.045]), ['animation'], [False])
 
         self.fig.canvas.mpl_connect('key_press_event', self.press)
         self.fig.canvas.mpl_connect('button_press_event', self.on_click)
@@ -64,6 +62,9 @@ class GUI(object):
         plt.show()
 
     def play_update(self):
+        if(not self.animation_check.get_status()[0]):
+            self.play_cnt = -1
+            return
         if self.play_cnt != -1:
             self.update()
             self.play_cnt += 1
@@ -83,14 +84,14 @@ class GUI(object):
         self.obsts = []
         self.update()
 
-    def on_play(self, event):
-        self.play_cnt = 0
 
     def on_run(self, event):
-        print("here1")
         subprocess.call(["../build/teb_demo", "path.txt", "../config/sample.yaml"])
         self.load("new_path.txt")
-        self.update()
+        if(self.animation_check.get_status()[0]):
+            self.play_cnt = 1
+        else:
+            self.update()
 
     def on_click(self, event):
         if event.button == 1 and  event.inaxes == self.ax:
@@ -206,22 +207,24 @@ class GUI(object):
             self.ax.plot(current_points[:,0], current_points[:,1], 'b-')
             self.ax.scatter(current_points[:,0], current_points[:,1], c='b')
 
-        self.draw_paths()
+        if(not self.animation_check.get_status()[0]):
+            self.draw_paths(len(self.paths))
+        else:
+            self.draw_paths(self.play_cnt)
 
         plt.draw()
 
-    def draw_paths(self):
+    def draw_paths(self, n):
         if(len(self.paths) == 0):
             return
         
-        n = self.play_cnt
         if n > len(self.paths) or n == -1:
             n = len(self.paths)
 
         path = np.array(self.paths)
         self.ax.plot(path[0:n,0], path[0:n,1], c='g',linewidth=0.5)
         vec = []
-        for p in path[0:n,:]:
+        for p in path[0:n]:
             c, s = np.cos(p[2]), np.sin(p[2])
             R = np.matrix(((c,-s), (s, c)))
             v = R*np.matrix([[1],[0]])
@@ -232,8 +235,7 @@ class GUI(object):
             polygon = polygon + np.tile( np.array([p[0], p[1]]), (self.polygon.shape[0], 1))
             self.ax.add_patch(plt.Polygon(polygon, color='g', alpha=0.1))
         vec = np.array(vec)
-
-        #self.ax.quiver(path[0:n,0], path[0:n,1], vec[0:n,0], vec[0:n,1], color='g',width=0.001, scale= 30)
+        self.ax.quiver(path[0:n,0], path[0:n,1], vec[0:n,0], vec[0:n,1], color='g',width=0.001, scale= 50)
 
 
 if __name__ == "__main__":

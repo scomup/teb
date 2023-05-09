@@ -217,8 +217,8 @@ void OptimalPlanner::addTimeEdges()
 {
   for (size_t i = 0; i < time_diffs_.size(); i++)
   {
-
     graph_.emplace_shared<TimeFactor>(T(i), time_diffs_[i], time_noise_);
+    //graph_.emplace_shared<TimeFactor>(T(i), 0, time_noise_);
     factor_type_.push_back("TimeFactor");
   }
 }
