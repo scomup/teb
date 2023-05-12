@@ -1,19 +1,20 @@
-# sampleCarto
+# Teb DEMO
 
-sampleCarto is a simplified version of cartograher(https://github.com/googlecartographer), it is used for studying LiDAR-SLAM.
-(Much easier to understand than cartographer.)
+A tool designed for individuals interested in learning TEB(http://wiki.ros.org/teb_local_planner). The basic algorithm is inherited from TEB, but the optimization algorithm utilizes GTSAM. Additionally, it provides a user-friendly Python GUI that allows for easy drawing of various obstacle-based environments to test the algorithm.
 
-The sampleCarto takes in a laser scans and wheel odometry, and outputs map.
-I have prepared a bag file (h1.bag), you can do some simple test.
+## Usage:
+Install gtsam.  
+https://gtsam.org/get_started/
 
-## usage:
-
+```bash
 mkdir build
 cd build
 cmake ..
 make 
-./sampleCarto
+cd srcipt
+python3 demo_gui.py
+```
 
-./rviz 
-add the visualization for map topic and node_list topic.
-# sampleCarto3D
+## Demo
+
+![Alt Text](demo.gif)

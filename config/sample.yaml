@@ -5,7 +5,7 @@ dt_hysteresis: 0.1
 min_samples: 3
 max_samples: 500
 
- # Robot
+# Robot
 max_vel_x: 1
 max_vel_x_backwards: 0.2
 max_vel_theta: 0.5

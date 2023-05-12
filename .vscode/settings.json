@@ -69,6 +69,7 @@
         "string": "cpp",
         "string_view": "cpp",
         "slist": "cpp",
-        "cfenv": "cpp"
+        "cfenv": "cpp",
+        "*.ipp": "cpp"
     }
 }
