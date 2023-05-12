@@ -20,5 +20,7 @@ python3 demo_gui.py
 * Hold 'Shift' while clicking the left mouse button to add a point for a polygon or line.
 * Click the right mouse button to close a polygon or line.
 * Change to "draw path" mode by button, drag the mouse to draw the initial path.
+* Press the "Save" button, then the "Run" button to draw an optimized path.
+
 
 ![Alt Text](demo.gif)
