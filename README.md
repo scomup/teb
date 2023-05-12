@@ -16,5 +16,9 @@ python3 demo_gui.py
 ```
 
 ## Demo
+* Change to "draw obst" mode by button.
+* Hold 'Shift' while clicking the left mouse button to add a point for a polygon or line.
+* Click the right mouse button to close a polygon or line.
+* Change to "draw path" mode by button, drag the mouse to draw the initial path.
 
 ![Alt Text](demo.gif)
